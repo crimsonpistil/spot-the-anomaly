@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Interactive network traffic detective. Spot anomalies in flow tables, log streams, and dashboards. MITRE ATT&CK-mapped scenarios for SOC analysts and threat hunters.">
+<title>[6B74] Spot the Anomaly // Net Detective</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0a0c10; --bg2:#0f1117; --bg3:#161b22; --bg4:#1c2230;
+  --border:#21262d; --border2:#30363d;
+  --text:#e6edf3; --text2:#8b949e; --text3:#6e7681;
+  --accent:#58a6ff; --accent2:#1f6feb;
+  --green:#3fb950; --amber:#d29922; --red:#f85149;
+  --purple:#bc8cff; --teal:#39d353; --orange:#ffa600;
+  --phosphor:#7ee787;
+  --glow-green:0 0 6px rgba(126,231,135,.35);
+  --glow-amber:0 0 6px rgba(210,153,34,.45);
+  --glow-red:0 0 6px rgba(248,81,73,.45);
+  --mono:'Cascadia Code','Fira Code','Consolas','Menlo','Courier New',monospace;
+  --crt:'VT323','Cascadia Code',monospace;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;line-height:1.6;min-height:100vh;position:relative}
+
+/* Subtle CRT scanlines — much lighter than v1 */
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:300;
+  background:repeating-linear-gradient(0deg,transparent 0,transparent 2px,rgba(126,231,135,.012) 2px,rgba(126,231,135,.012) 3px);
+}
+/* Soft vignette */
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:299;
+  background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.35) 100%);
+}
+
+/* BOOT OVERLAY */
+#boot{
+  position:fixed;inset:0;z-index:9999;background:var(--bg);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:12px;color:var(--phosphor);
+  text-shadow:var(--glow-green);
+}
+#boot.gone{opacity:0;pointer-events:none;transition:opacity .35s ease}
+.boot-inner{max-width:560px;padding:24px;width:100%}
+.boot-line{margin:2px 0;white-space:pre;opacity:0;animation:bootln .25s forwards}
+.boot-ok{color:var(--green)}
+.boot-warn{color:var(--amber);text-shadow:var(--glow-amber)}
+.boot-cursor{display:inline-block;width:9px;height:14px;background:var(--phosphor);box-shadow:var(--glow-green);animation:blink 1s steps(2) infinite;vertical-align:-2px;margin-left:4px}
+@keyframes bootln{to{opacity:1}}
+@keyframes blink{50%{opacity:0}}
+
+/* HEADER */
+header{background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 20px;position:sticky;top:0;z-index:200;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.logo{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);white-space:nowrap;text-decoration:none}
+.logo span{color:var(--text3);font-weight:400}
+.crumb{font-family:var(--mono);font-size:11px;color:var(--text3);white-space:nowrap}
+.crumb a{color:var(--text3);text-decoration:none}
+.crumb a:hover{color:var(--accent)}
+
+.site-switcher{display:inline-flex;align-items:center;background:var(--bg);border:1px solid var(--border2);border-radius:5px;overflow:hidden;font-family:var(--mono);font-size:10px;font-weight:700;margin:0 6px;letter-spacing:.06em}
+.switcher-side{padding:5px 11px;color:var(--text3);text-decoration:none;transition:all .15s;border-right:1px solid var(--border2);cursor:pointer}
+.switcher-side:last-child{border-right:none}
+.switcher-side:hover:not(.active){color:var(--text);background:var(--bg2)}
+.switcher-side.active{background:var(--accent);color:#fff;cursor:default}
+
+.header-right{display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap}
+.live-dot{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--phosphor);text-shadow:var(--glow-green);letter-spacing:.1em}
+.live-dot::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--phosphor);box-shadow:var(--glow-green);animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.stat{font-family:var(--mono);font-size:10px;color:var(--text3);white-space:nowrap}
+.stat strong{color:var(--text);font-weight:600}
+.stat .v-good{color:var(--phosphor);text-shadow:var(--glow-green)}
+.stat .v-warn{color:var(--amber);text-shadow:var(--glow-amber)}
+.stat .v-bad{color:var(--red);text-shadow:var(--glow-red)}
+
+/* MODE BAR */
+.mode-bar{background:var(--bg3);border-bottom:1px solid var(--border);padding:6px 20px;display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.mode-bar .filter-label{font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em;margin-right:4px}
+.mode-btn{background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text2);font-family:var(--mono);font-size:10px;font-weight:500;padding:3px 10px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.mode-btn:hover{border-color:var(--accent);color:var(--accent)}
+.mode-btn.active{background:var(--accent2);border-color:var(--accent);color:#fff}
+.spacer{flex:1}
+.reset-btn{background:transparent;border:1px solid var(--border2);border-radius:4px;color:var(--text3);font-family:var(--mono);font-size:10px;padding:3px 10px;cursor:pointer}
+.reset-btn:hover{border-color:var(--red);color:var(--red)}
+
+/* LAYOUT */
+.container{max-width:1400px;margin:0 auto;padding:16px 20px;display:grid;grid-template-columns:240px 1fr;gap:16px;align-items:start}
+@media(max-width:900px){.container{grid-template-columns:1fr}}
+
+/* SIDEBAR */
+.sidebar{position:sticky;top:96px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px}
+.sidebar-title{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px}
+.toc-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:5px;cursor:pointer;color:var(--text2);transition:background .15s;margin-bottom:2px}
+.toc-item:hover{background:var(--bg3);color:var(--text)}
+.toc-item.active{background:rgba(31,111,235,.15);color:var(--accent)}
+.toc-item.done{color:var(--text3)}
+.toc-item.done .toc-id{color:var(--green)}
+.toc-id{font-family:var(--mono);font-size:10px;font-weight:600;min-width:46px;color:var(--accent)}
+.toc-name{font-size:11px;flex:1}
+.toc-mark{font-family:var(--mono);font-size:10px;color:var(--text3);margin-left:auto}
+.toc-mark.pass{color:var(--green)}
+.toc-mark.partial{color:var(--amber)}
+.toc-mark.fail{color:var(--red)}
+.sidebar-divider{border:none;border-top:1px solid var(--border);margin:10px 0}
+.sidebar-stat{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--text3);padding:3px 8px}
+.sidebar-stat strong{color:var(--text)}
+
+/* MAIN */
+main{min-width:0}
+
+/* SCENARIO HEADER (mirrors tech-header) */
+.sc-header{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:7px 7px 0 0}
+.sc-id{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--accent);background:rgba(31,111,235,.15);border:1px solid rgba(88,166,255,.3);border-radius:4px;padding:2px 7px;text-shadow:0 0 4px rgba(88,166,255,.4)}
+.sc-name{font-size:13px;font-weight:600}
+.diff-badge{font-family:var(--mono);font-size:10px;font-weight:700;border-radius:4px;padding:2px 7px;border:1px solid;margin-left:4px}
+.diff-easy{color:var(--green);border-color:var(--green);background:rgba(63,185,80,.1)}
+.diff-medium{color:var(--amber);border-color:var(--amber);background:rgba(210,153,34,.1)}
+.diff-hard{color:var(--red);border-color:var(--red);background:rgba(248,81,73,.1)}
+.view-tag{font-family:var(--mono);font-size:10px;color:var(--text3);margin-left:auto;background:var(--bg4);border-radius:3px;padding:2px 8px}
+
+.sc-body{background:var(--bg2);border:1px solid var(--border);border-top:none;padding:14px 16px}
+.sc-brief{font-size:13px;color:var(--text2);line-height:1.7}
+.sc-brief strong{color:var(--text)}
+
+.callout{background:var(--bg3);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:4px;padding:10px 14px;margin-top:12px;font-size:12px;color:var(--text2);line-height:1.6}
+.callout.hint{border-left-color:var(--amber)}
+.callout-label{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:4px}
+.callout.hint .callout-label{color:var(--amber)}
+
+/* DATA VIEW */
+.data-view{background:var(--bg2);border:1px solid var(--border);border-top:none;overflow:hidden}
+.code-hdr{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:var(--bg3);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.code-lang{font-family:var(--mono);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--purple)}
+.code-meta{font-family:var(--mono);font-size:10px;color:var(--text3)}
+
+/* FLOW TABLE */
+table.flows{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px}
+table.flows thead{background:var(--bg3)}
+table.flows th{text-align:left;padding:7px 10px;font-weight:600;color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);white-space:nowrap}
+table.flows td{padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap}
+table.flows td.wrap{white-space:normal}
+table.flows tbody tr{cursor:pointer;transition:background .1s}
+table.flows tbody tr:hover{background:var(--bg3)}
+table.flows tbody tr.selected{background:rgba(31,111,235,.1)!important;box-shadow:inset 3px 0 0 var(--accent)}
+table.flows tbody tr.correct{background:rgba(63,185,80,.08)!important;box-shadow:inset 3px 0 0 var(--green)}
+table.flows tbody tr.missed{background:rgba(248,81,73,.08)!important;box-shadow:inset 3px 0 0 var(--red)}
+table.flows tbody tr.fp{background:rgba(248,81,73,.04)!important;box-shadow:inset 3px 0 0 var(--red);opacity:.65}
+table.flows .col-idx{color:var(--text3);width:30px}
+table.flows .col-port{color:var(--accent)}
+table.flows .col-proto{color:var(--purple)}
+.row-mark{display:inline-block;width:14px;color:var(--accent);font-weight:700}
+
+/* LOG STREAM */
+.log-stream{font-family:var(--mono);font-size:11px;max-height:520px;overflow-y:auto}
+.log-line{padding:7px 12px;border-bottom:1px solid var(--border);cursor:pointer;display:grid;grid-template-columns:28px 78px 70px 1fr;gap:10px;align-items:start;transition:background .1s;color:var(--text2)}
+.log-line:hover{background:var(--bg3)}
+.log-line.selected{background:rgba(31,111,235,.1);box-shadow:inset 3px 0 0 var(--accent);color:var(--text)}
+.log-line.correct{background:rgba(63,185,80,.08);box-shadow:inset 3px 0 0 var(--green)}
+.log-line.missed{background:rgba(248,81,73,.08);box-shadow:inset 3px 0 0 var(--red)}
+.log-line.fp{background:rgba(248,81,73,.04);box-shadow:inset 3px 0 0 var(--red);opacity:.65}
+.log-idx{color:var(--text3)}
+.log-time{color:var(--text3)}
+.log-source{color:var(--purple);font-weight:600;text-transform:uppercase;font-size:10px}
+.log-msg{color:var(--text);word-break:break-all;line-height:1.5}
+
+/* CONTROLS */
+.controls{background:var(--bg2);border:1px solid var(--border);border-top:none;border-radius:0 0 7px 7px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.sel-count{font-family:var(--mono);font-size:11px;color:var(--text3)}
+.sel-count strong{color:var(--accent);font-weight:700}
+.btn-group{display:flex;gap:6px;flex-wrap:wrap}
+.btn{background:var(--bg3);border:1px solid var(--border2);border-radius:5px;color:var(--text2);font-family:var(--mono);font-size:10px;font-weight:600;padding:5px 12px;cursor:pointer;transition:all .15s;text-transform:uppercase;letter-spacing:.05em}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn-primary{background:var(--accent2);border-color:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent);color:#fff}
+.btn-warn{border-color:var(--amber);color:var(--amber)}
+.btn-warn:hover{background:rgba(210,153,34,.15)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn:disabled:hover{border-color:var(--border2);color:var(--text2);background:var(--bg3)}
+
+/* REVEAL */
+.reveal{background:var(--bg2);border:1px solid var(--green);border-radius:8px;margin-top:16px;overflow:hidden}
+.reveal.partial{border-color:var(--amber)}
+.reveal.fail{border-color:var(--red)}
+.reveal-hdr{display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--bg3);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.reveal-score{font-family:var(--crt);font-size:42px;font-weight:400;color:var(--phosphor);text-shadow:var(--glow-green);line-height:1;letter-spacing:.02em}
+.reveal.partial .reveal-score{color:var(--amber);text-shadow:var(--glow-amber)}
+.reveal.fail .reveal-score{color:var(--red);text-shadow:var(--glow-red)}
+.reveal-score small{font-size:14px;color:var(--text3);font-weight:400;text-shadow:none;font-family:var(--mono)}
+.verdict{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 8px;border:1px solid;border-radius:4px}
+.v-confirmed{color:var(--green);border-color:var(--green);background:rgba(63,185,80,.1)}
+.v-partial{color:var(--amber);border-color:var(--amber);background:rgba(210,153,34,.1)}
+.v-incon{color:var(--red);border-color:var(--red);background:rgba(248,81,73,.1)}
+.reveal-stats{display:flex;gap:12px;font-family:var(--mono);font-size:10px;margin-left:auto;flex-wrap:wrap}
+.reveal-stats span{padding:3px 8px;border-radius:4px;background:var(--bg4)}
+.s-hit{color:var(--green)}
+.s-miss{color:var(--red)}
+.s-fp{color:var(--amber)}
+
+/* TABS (mirrors hunt site detail panel) */
+.tab-bar{display:flex;gap:2px;border-bottom:1px solid var(--border);padding:0 12px;background:var(--bg2)}
+.dtab{background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);font-family:var(--mono);font-size:11px;font-weight:500;padding:8px 14px 9px;cursor:pointer;transition:all .15s;margin-bottom:-1px}
+.dtab:hover{color:var(--text2)}
+.dtab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.dtab.t-mit.active{color:var(--amber);border-bottom-color:var(--amber)}
+.dtab.t-det.active{color:var(--purple);border-bottom-color:var(--purple)}
+.tab-panel{display:none;padding:14px 16px}
+.tab-panel.active{display:block}
+.tab-panel p{font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:10px}
+.tab-panel p:last-child{margin-bottom:0}
+.tab-panel strong{color:var(--text)}
+.tab-panel code{font-family:var(--mono);font-size:11px;background:var(--bg);border:1px solid var(--border2);padding:1px 5px;border-radius:3px;color:var(--accent)}
+
+.mitre-list{display:flex;flex-direction:column;gap:8px}
+.mitre-tag{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:5px}
+.mitre-id{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--amber);background:rgba(210,153,34,.1);border:1px solid rgba(210,153,34,.3);border-radius:3px;padding:2px 7px;flex-shrink:0}
+.mitre-name{font-size:12px;color:var(--text)}
+
+.detect-block{background:var(--bg);border:1px solid var(--border2);border-radius:6px;overflow:hidden;margin-bottom:10px}
+.detect-hdr{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--bg3);border-bottom:1px solid var(--border)}
+.detect-lang{font-family:var(--mono);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.l-ark{color:var(--purple)} .l-kib{color:var(--teal)} .l-sur{color:var(--red)}
+.copy-btn{background:none;border:1px solid var(--border2);border-radius:4px;color:var(--text3);font-family:var(--mono);font-size:9px;padding:2px 8px;cursor:pointer;transition:all .15s}
+.copy-btn:hover{border-color:var(--accent);color:var(--accent)}
+.copy-btn.copied{border-color:var(--green);color:var(--green)}
+.detect-body{padding:10px 12px;font-family:var(--mono);font-size:11px;color:#a5d6ff;white-space:pre-wrap;word-break:break-all;line-height:1.7;max-height:200px;overflow-y:auto}
+
+.next-bar{display:flex;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--border);background:var(--bg3)}
+
+/* COMPLETE */
+.complete{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:32px 24px;text-align:center}
+.complete h2{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--accent);margin-bottom:6px;letter-spacing:.05em}
+.complete .sub{font-size:12px;color:var(--text3);margin-bottom:20px}
+.final-score{font-family:var(--crt);font-size:96px;font-weight:400;color:var(--phosphor);text-shadow:0 0 12px rgba(126,231,135,.5),0 0 24px rgba(126,231,135,.25);line-height:1;margin:16px 0 4px;letter-spacing:.02em}
+.final-score.partial{color:var(--amber);text-shadow:0 0 12px rgba(210,153,34,.55),0 0 24px rgba(210,153,34,.25)}
+.final-score.fail{color:var(--red);text-shadow:0 0 12px rgba(248,81,73,.55),0 0 24px rgba(248,81,73,.25)}
+.final-verdict{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text2);margin-bottom:18px}
+.summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:520px;margin:18px auto;font-family:var(--mono);font-size:10px}
+.summary-cell{background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:10px}
+.summary-cell .lbl{color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px}
+.summary-cell .val{font-family:var(--crt);font-size:32px;font-weight:400;color:var(--text);line-height:1;letter-spacing:.02em}
+.complete .btn-group{justify-content:center;margin-top:16px}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+@media(max-width:700px){
+  .reveal-stats{margin-left:0;width:100%}
+  .header-right .stat{display:none}
+  .header-right .stat.keep{display:inline}
+}
+</style>
+</head>
+<body>
+
+<div id="boot">
+  <div class="boot-inner" id="boot-inner"></div>
+</div>
+
+<header>
+  <a class="logo" href="https://6b74.dev">[6B74]<span> :: spot-the-anomaly</span></a>
+  <div class="site-switcher">
+    <a class="switcher-side" href="https://hunt.6b74.dev">HUNT</a>
+    <span class="switcher-side active">DETECT</span>
+  </div>
+  <div class="crumb">// network traffic detective</div>
+  <div class="header-right">
+    <span class="live-dot">SESSION LIVE</span>
+    <span class="stat keep">SCENARIO <strong id="stat-scenario">1/2</strong></span>
+    <span class="stat">SCORE <strong id="stat-score" class="v-good">0</strong></span>
+    <span class="stat">HITS <strong id="stat-hits" class="v-good">0</strong></span>
+    <span class="stat">MISS <strong id="stat-misses" class="v-bad">0</strong></span>
+  </div>
+</header>
+
+<div class="mode-bar">
+  <span class="filter-label">MODE:</span>
+  <button class="mode-btn active" data-mode="tutorial">▸ Tutorial</button>
+  <button class="mode-btn" data-mode="challenge">▸ Challenge</button>
+  <span class="spacer"></span>
+  <button class="reset-btn" id="btn-reset">↻ Reset Run</button>
+</div>
+
+<div class="container">
+
+  <aside class="sidebar">
+    <div class="sidebar-title">▸ Scenario Index</div>
+    <div id="toc"></div>
+    <hr class="sidebar-divider">
+    <div class="sidebar-title">▸ Run Stats</div>
+    <div class="sidebar-stat"><span>Total Score</span><strong id="side-score">0</strong></div>
+    <div class="sidebar-stat"><span>Avg / Scenario</span><strong id="side-avg">—</strong></div>
+    <div class="sidebar-stat"><span>True Positives</span><strong id="side-tp" style="color:var(--green)">0</strong></div>
+    <div class="sidebar-stat"><span>Missed</span><strong id="side-miss" style="color:var(--red)">0</strong></div>
+    <div class="sidebar-stat"><span>False Positives</span><strong id="side-fp" style="color:var(--amber)">0</strong></div>
+  </aside>
+
+  <main id="main"></main>
+
+</div>
+
+<script>
+/* ============================================================
+   SCENARIO DATA
+   ============================================================ */
+/* ============================================================
+   TODO · SCENARIO IDEAS (build when inspired)
+   ============================================================
+   - LLMNR/NBT-NS poisoning (logs view, mixed broadcast traffic)
+   - Pass-the-Hash / NTLM relay (Kerberos absence + SMB pattern)
+   - DCSync replication request (kerberos + DRSUAPI)
+   - JA3/JA4 hash anomaly (TLS fingerprint stands out from baseline)
+   - Domain Generation Algorithm beacons (DNS view with DGA strings)
+   - PsExec admin share + service creation (SMB + service log mix)
+   - Golden Ticket (kerberos with absurd lifetime)
+   - LSASS dump exfil over SMB (zeek files.log pattern)
+   - Cobalt Strike default profile (HTTP user-agent + URI tells)
+   - HARD: legitimate-looking flow with one subtle anomaly (low signal)
+   ============================================================ */
+
+const SCENARIOS = [
+  {
+    id: 'SCN-001',
+    title: 'Suspected C2 Beaconing',
+    difficulty: 'EASY',
+    viewType: 'flows',
+    brief: 'Endpoint <strong>10.0.4.22</strong> was flagged by behavioral analytics. Pull a 30-minute window of its outbound flows and identify any sessions consistent with command-and-control beaconing.',
+    columns: ['#', 'TIME', 'SRC', 'DST', 'PORT', 'PROTO', 'PACKETS', 'BYTES', 'DUR'],
+    rows: [
+      { time: '14:02:11', src: '10.0.4.22', dst: '52.84.150.39', port: 443, proto: 'TCP', pkts: 142, bytes: '1.2 MB', dur: '8.3s' },
+      { time: '14:02:47', src: '10.0.4.22', dst: '185.220.101.42', port: 443, proto: 'TCP', pkts: 8, bytes: '1.4 KB', dur: '0.4s' },
+      { time: '14:03:18', src: '10.0.4.22', dst: '142.250.80.46', port: 443, proto: 'TCP', pkts: 89, bytes: '780 KB', dur: '5.1s' },
+      { time: '14:04:47', src: '10.0.4.22', dst: '185.220.101.42', port: 443, proto: 'TCP', pkts: 8, bytes: '1.4 KB', dur: '0.4s' },
+      { time: '14:05:02', src: '10.0.4.22', dst: '13.107.42.14', port: 443, proto: 'TCP', pkts: 220, bytes: '2.1 MB', dur: '12.4s' },
+      { time: '14:06:47', src: '10.0.4.22', dst: '185.220.101.42', port: 443, proto: 'TCP', pkts: 8, bytes: '1.4 KB', dur: '0.4s' },
+      { time: '14:07:33', src: '10.0.4.22', dst: '52.84.150.39', port: 443, proto: 'TCP', pkts: 67, bytes: '512 KB', dur: '3.2s' },
+      { time: '14:08:47', src: '10.0.4.22', dst: '185.220.101.42', port: 443, proto: 'TCP', pkts: 8, bytes: '1.4 KB', dur: '0.4s' },
+      { time: '14:09:14', src: '10.0.4.22', dst: '17.253.144.10', port: 443, proto: 'TCP', pkts: 34, bytes: '88 KB', dur: '1.8s' },
+      { time: '14:10:47', src: '10.0.4.22', dst: '185.220.101.42', port: 443, proto: 'TCP', pkts: 8, bytes: '1.4 KB', dur: '0.4s' },
+      { time: '14:11:55', src: '10.0.4.22', dst: '142.250.80.46', port: 443, proto: 'TCP', pkts: 45, bytes: '210 KB', dur: '2.1s' },
+      { time: '14:12:47', src: '10.0.4.22', dst: '185.220.101.42', port: 443, proto: 'TCP', pkts: 8, bytes: '1.4 KB', dur: '0.4s' },
+    ],
+    malicious: [1, 3, 5, 7, 9, 11],
+    hint: 'Look at <strong>timing</strong> and <strong>size</strong>. Legitimate user traffic is bursty and irregular. Beacons are mechanical — same destination, same payload size, same interval.',
+    explanation: 'Six flows to <code>185.220.101.42</code> occur at exactly 2-minute intervals (14:02:47, 14:04:47, 14:06:47…), each transferring an identical 1.4 KB payload in 8 packets. This is textbook C2 beaconing: a regular, low-volume callback to check for operator instructions. The other flows show normal user-driven variability in size and timing. The destination IP also belongs to a known Tor exit node range — another red flag.',
+    mitre: [
+      { id: 'T1071.001', name: 'Application Layer Protocol: Web Protocols' },
+      { id: 'T1573', name: 'Encrypted Channel' },
+      { id: 'T1090', name: 'Proxy' },
+    ],
+    detection: [
+      { tool: 'arkime', label: 'Arkime', code: 'ip.dst == 185.220.101.42 && length < 2000 && tcp.flags.syn == 1' },
+      { tool: 'kibana', label: 'Kibana (KQL)', code: 'destination.ip:"185.220.101.42" AND network.bytes < 2000' },
+      { tool: 'suricata', label: 'Suricata', code: 'alert tcp $HOME_NET any -> 185.220.101.0/24 any (msg:"Possible C2 beacon to Tor exit"; flow:established; threshold:type both, track by_src, count 3, seconds 600; sid:1000001;)' },
+    ],
+  },
+  {
+    id: 'SCN-002',
+    title: 'Anomalous DNS Activity',
+    difficulty: 'MEDIUM',
+    viewType: 'logs',
+    brief: 'DNS query logs from the resolver. Workstation <strong>10.0.4.51</strong> was identified as exhibiting unusual lookup patterns. Identify queries that suggest data exfiltration or DNS tunneling.',
+    rows: [
+      { time: '09:11:02', src: 'dns.log', msg: '10.0.4.51 → query A google.com' },
+      { time: '09:11:04', src: 'dns.log', msg: '10.0.4.51 → query A maps.googleapis.com' },
+      { time: '09:11:18', src: 'dns.log', msg: '10.0.4.51 → query TXT a8f3k9.s2bjx7.q1mn4z.tunnel-svc.io' },
+      { time: '09:11:22', src: 'dns.log', msg: '10.0.4.51 → query A cdn.cloudflare.net' },
+      { time: '09:11:26', src: 'dns.log', msg: '10.0.4.51 → query TXT b7g2m1.x4ncv8.p9wq3a.tunnel-svc.io' },
+      { time: '09:11:31', src: 'dns.log', msg: '10.0.4.51 → query A api.github.com' },
+      { time: '09:11:38', src: 'dns.log', msg: '10.0.4.51 → query TXT c4h1n5.z6mvr3.k8tu7e.tunnel-svc.io' },
+      { time: '09:11:42', src: 'dns.log', msg: '10.0.4.51 → query A outlook.office365.com' },
+      { time: '09:11:47', src: 'dns.log', msg: '10.0.4.51 → query TXT d9j5p2.w3nbk1.r6sx8c.tunnel-svc.io' },
+      { time: '09:11:51', src: 'dns.log', msg: '10.0.4.51 → query A teams.microsoft.com' },
+      { time: '09:11:55', src: 'dns.log', msg: '10.0.4.51 → query A slack.com' },
+      { time: '09:11:59', src: 'dns.log', msg: '10.0.4.51 → query TXT e2k8q4.v5pmh9.l7wx1d.tunnel-svc.io' },
+      { time: '09:12:04', src: 'dns.log', msg: '10.0.4.51 → query A telemetry.example.com' },
+      { time: '09:12:08', src: 'dns.log', msg: '10.0.4.51 → query A fonts.gstatic.com' },
+    ],
+    malicious: [2, 4, 6, 8, 11],
+    hint: '<strong>TXT record queries</strong> are uncommon for normal user browsing. Look at the <strong>structure</strong> of subdomain labels — random-looking strings can be encoded payloads.',
+    explanation: 'Five TXT-record queries to subdomains of <code>tunnel-svc.io</code> contain high-entropy, randomized labels (e.g., <code>a8f3k9.s2bjx7.q1mn4z</code>) — characteristic of DNS tunneling, where data is encoded into subdomain names and exfiltrated as DNS queries. The TXT response type is favored because it returns arbitrary strings, providing a bidirectional covert channel. Legitimate user browsing rarely generates TXT lookups, and never with this kind of randomized label structure at sustained intervals.',
+    mitre: [
+      { id: 'T1071.004', name: 'Application Layer Protocol: DNS' },
+      { id: 'T1048.003', name: 'Exfiltration over Unencrypted Non-C2 Protocol' },
+      { id: 'T1568.002', name: 'Domain Generation Algorithms' },
+    ],
+    detection: [
+      { tool: 'arkime', label: 'Arkime', code: 'dns.qt == TXT && dns.host == "*.tunnel-svc.io"' },
+      { tool: 'kibana', label: 'Kibana (KQL)', code: 'dns.question.type:"TXT" AND dns.question.name:*.tunnel-svc.io' },
+      { tool: 'suricata', label: 'Suricata', code: 'alert dns $HOME_NET any -> any any (msg:"DNS tunneling - high entropy TXT query"; dns.query; content:"tunnel-svc.io"; nocase; sid:1000002;)' },
+    ],
+  },
+
+  /* ====== SCN-003 · RECON · Active Scanning ====== */
+  {
+    id: 'SCN-003',
+    title: 'External Port Sweep',
+    difficulty: 'EASY',
+    viewType: 'flows',
+    brief: 'Perimeter firewall logs show unusual inbound activity targeting the DMZ web server <strong>198.51.100.20</strong>. Identify connection attempts consistent with reconnaissance scanning.',
+    columns: ['#', 'TIME', 'SRC', 'DST', 'PORT', 'PROTO', 'PACKETS', 'BYTES', 'DUR'],
+    rows: [
+      { time: '03:14:02', src: '203.0.113.45', dst: '198.51.100.20', port: 443, proto: 'TCP', pkts: 142, bytes: '380 KB', dur: '6.2s' },
+      { time: '03:14:18', src: '198.18.42.7',  dst: '198.51.100.20', port: 21,   proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
+      { time: '03:14:18', src: '198.18.42.7',  dst: '198.51.100.20', port: 22,   proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
+      { time: '03:14:18', src: '198.18.42.7',  dst: '198.51.100.20', port: 23,   proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
+      { time: '03:14:18', src: '198.18.42.7',  dst: '198.51.100.20', port: 25,   proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
+      { time: '03:14:19', src: '198.18.42.7',  dst: '198.51.100.20', port: 53,   proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
+      { time: '03:14:19', src: '198.18.42.7',  dst: '198.51.100.20', port: 80,   proto: 'TCP', pkts: 4,   bytes: '480 B',  dur: '0.2s' },
+      { time: '03:14:19', src: '198.18.42.7',  dst: '198.51.100.20', port: 110,  proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
+      { time: '03:14:19', src: '198.18.42.7',  dst: '198.51.100.20', port: 143,  proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
+      { time: '03:14:20', src: '198.18.42.7',  dst: '198.51.100.20', port: 443,  proto: 'TCP', pkts: 4,   bytes: '480 B',  dur: '0.2s' },
+      { time: '03:14:20', src: '198.18.42.7',  dst: '198.51.100.20', port: 445,  proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
+      { time: '03:14:20', src: '198.18.42.7',  dst: '198.51.100.20', port: 3389, proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
+      { time: '03:15:44', src: '74.125.224.72',dst: '198.51.100.20', port: 443,  proto: 'TCP', pkts: 88,  bytes: '290 KB', dur: '4.8s' },
+      { time: '03:16:11', src: '203.0.113.99', dst: '198.51.100.20', port: 80,   proto: 'TCP', pkts: 22,  bytes: '14 KB',  dur: '1.2s' },
+    ],
+    malicious: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+    hint: 'Look for a single source attempting many <strong>different ports</strong> in rapid succession. Tiny packet counts and minimal bytes are a tell — the scanner is testing for open services, not transferring data.',
+    explanation: 'Source <code>198.18.42.7</code> issued 11 connection attempts to sequential well-known service ports (21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 3389) within ~2 seconds, each with only 2-4 packets and minimal bytes. This is a classic TCP port sweep — the attacker is probing for open services to identify the attack surface. Real user traffic to the same host would target a single service (usually 80/443) with a sustained data exchange. Rows 0, 12, and 13 show normal HTTPS sessions with healthy byte counts and durations.',
+    mitre: [
+      { id: 'T1595.001', name: 'Active Scanning: Scanning IP Blocks' },
+      { id: 'T1046',     name: 'Network Service Discovery' },
+    ],
+    detection: [
+      { tool: 'arkime',   label: 'Arkime',       code: 'ip.src == 198.18.42.7 && packets.src < 5 && length < 500' },
+      { tool: 'kibana',   label: 'Kibana (KQL)', code: 'source.ip:"198.18.42.7" AND network.packets < 5 AND destination.port:(21 OR 22 OR 23 OR 25 OR 53 OR 110 OR 143 OR 445 OR 3389)' },
+      { tool: 'suricata', label: 'Suricata',     code: 'alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"Possible TCP port sweep"; flags:S; threshold:type both, track by_src, count 10, seconds 60; sid:1000003;)' },
+    ],
+  },
+
+  /* ====== SCN-004 · INITIAL ACCESS · Public-Facing App Exploit ====== */
+  {
+    id: 'SCN-004',
+    title: 'Web App Exploitation Attempt',
+    difficulty: 'MEDIUM',
+    viewType: 'logs',
+    brief: 'Web server access logs from the customer portal at <strong>app.example.com</strong>. The SOC received an alert about anomalous request patterns. Identify requests that show signs of exploitation, not legitimate browsing.',
+    rows: [
+      { time: '11:42:03', src: 'access.log', msg: 'GET /index.html 200 198.51.100.5 Mozilla/5.0' },
+      { time: '11:42:08', src: 'access.log', msg: 'GET /products?id=42 200 198.51.100.5 Mozilla/5.0' },
+      { time: '11:42:14', src: 'access.log', msg: 'GET /products?id=43 200 198.51.100.5 Mozilla/5.0' },
+      { time: '11:42:31', src: 'access.log', msg: 'GET /products?id=42%27%20OR%201%3D1-- 500 203.0.113.77 curl/7.81.0' },
+      { time: '11:42:33', src: 'access.log', msg: 'GET /products?id=42%27%20UNION%20SELECT%20null%2Cusername%2Cpassword%20FROM%20users-- 500 203.0.113.77 curl/7.81.0' },
+      { time: '11:42:36', src: 'access.log', msg: 'GET /search?q=test 200 198.51.100.5 Mozilla/5.0' },
+      { time: '11:42:41', src: 'access.log', msg: 'GET /products?id=42%3B%20DROP%20TABLE%20users-- 500 203.0.113.77 sqlmap/1.7.2' },
+      { time: '11:42:47', src: 'access.log', msg: 'POST /login 401 198.51.100.5 Mozilla/5.0' },
+      { time: '11:42:52', src: 'access.log', msg: 'POST /login 200 198.51.100.5 Mozilla/5.0' },
+      { time: '11:42:58', src: 'access.log', msg: 'GET /upload?file=../../../../etc/passwd 403 203.0.113.77 curl/7.81.0' },
+      { time: '11:43:04', src: 'access.log', msg: 'GET /api/users 200 198.51.100.5 Mozilla/5.0' },
+      { time: '11:43:11', src: 'access.log', msg: 'GET /admin 403 198.51.100.5 Mozilla/5.0' },
+      { time: '11:43:18', src: 'access.log', msg: 'POST /upload?cmd=%3C%3Fphp%20system%28%24_GET%5B%22c%22%5D%29%3B%20%3F%3E 200 203.0.113.77 curl/7.81.0' },
+      { time: '11:43:24', src: 'access.log', msg: 'GET /favicon.ico 200 198.51.100.5 Mozilla/5.0' },
+    ],
+    malicious: [3, 4, 6, 9, 12],
+    hint: 'URL-decode mentally as you scan. Look for <strong>SQL syntax</strong> (<code>UNION</code>, <code>OR 1=1</code>), <strong>directory traversal</strong> (<code>../</code>), and unusual <strong>user-agents</strong> like <code>sqlmap</code> or raw <code>curl</code>. 403/500 status codes also flag suspicious activity.',
+    explanation: 'Five requests from <code>203.0.113.77</code> show clear exploitation attempts. Decoded payloads: row 3 is SQL injection (<code>id=42\' OR 1=1--</code>), row 4 is a UNION-based SQLi extracting credentials (<code>UNION SELECT null,username,password FROM users</code>), row 6 attempts a destructive <code>DROP TABLE</code>, row 9 is a path traversal trying to read <code>/etc/passwd</code>, and row 12 attempts to upload a PHP webshell. The user-agents <code>curl/7.81.0</code> and <code>sqlmap/1.7.2</code> are dead giveaways — sqlmap is an automated SQL injection tool, and no real user browses with raw curl. The other requests from <code>198.51.100.5</code> show normal user behavior with a browser UA.',
+    mitre: [
+      { id: 'T1190', name: 'Exploit Public-Facing Application' },
+      { id: 'T1505.003', name: 'Server Software Component: Web Shell' },
+    ],
+    detection: [
+      { tool: 'arkime',   label: 'Arkime',       code: 'http.uri == "*UNION*SELECT*" || http.uri == "*../*" || http.user-agent == "*sqlmap*"' },
+      { tool: 'kibana',   label: 'Kibana (KQL)', code: 'url.original:(*UNION*SELECT* OR *%2E%2E%2F* OR *DROP%20TABLE*) OR user_agent.original:*sqlmap*' },
+      { tool: 'suricata', label: 'Suricata',     code: 'alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"Possible SQLi - UNION SELECT"; http.uri; content:"UNION"; nocase; content:"SELECT"; nocase; distance:0; within:30; sid:1000004;)' },
+    ],
+  },
+
+  /* ====== SCN-005 · DISCOVERY · Internal Recon ====== */
+  {
+    id: 'SCN-005',
+    title: 'Internal Network Enumeration',
+    difficulty: 'MEDIUM',
+    viewType: 'logs',
+    brief: 'Zeek logs from a finance department workstation <strong>10.10.20.55</strong> after the user reported "the computer is being weird." Identify activity inconsistent with normal endpoint behavior — what does this user have no business doing?',
+    rows: [
+      { time: '13:02:11', src: 'http.log',  msg: '10.10.20.55 → outlook.office365.com GET /owa/' },
+      { time: '13:02:34', src: 'dns.log',   msg: '10.10.20.55 → query A sharepoint.example.com' },
+      { time: '13:03:02', src: 'conn.log',  msg: '10.10.20.55 → 10.10.20.1:53 (DNS) 88 bytes' },
+      { time: '13:03:04', src: 'conn.log',  msg: '10.10.20.55 → 10.10.10.1:445 (SMB) 142 bytes' },
+      { time: '13:03:04', src: 'conn.log',  msg: '10.10.20.55 → 10.10.10.2:445 (SMB) 142 bytes' },
+      { time: '13:03:04', src: 'conn.log',  msg: '10.10.20.55 → 10.10.10.3:445 (SMB) 142 bytes' },
+      { time: '13:03:04', src: 'conn.log',  msg: '10.10.20.55 → 10.10.10.4:445 (SMB) 142 bytes' },
+      { time: '13:03:04', src: 'conn.log',  msg: '10.10.20.55 → 10.10.10.5:445 (SMB) 142 bytes' },
+      { time: '13:03:21', src: 'kerberos.log', msg: '10.10.20.55 → DC1: TGS-REQ for cifs/fileserver01.corp.local' },
+      { time: '13:03:22', src: 'kerberos.log', msg: '10.10.20.55 → DC1: TGS-REQ for cifs/fileserver02.corp.local' },
+      { time: '13:03:22', src: 'kerberos.log', msg: '10.10.20.55 → DC1: TGS-REQ for cifs/fileserver03.corp.local' },
+      { time: '13:03:23', src: 'kerberos.log', msg: '10.10.20.55 → DC1: TGS-REQ for ldap/dc1.corp.local' },
+      { time: '13:03:24', src: 'kerberos.log', msg: '10.10.20.55 → DC1: TGS-REQ for host/admin-ws01.corp.local' },
+      { time: '13:03:48', src: 'ldap.log',  msg: '10.10.20.55 → DC1: search base="DC=corp,DC=local" filter="(objectClass=user)"' },
+      { time: '13:03:51', src: 'ldap.log',  msg: '10.10.20.55 → DC1: search base="DC=corp,DC=local" filter="(memberOf=CN=Domain Admins,*)"' },
+      { time: '13:04:12', src: 'http.log',  msg: '10.10.20.55 → outlook.office365.com GET /owa/inbox' },
+    ],
+    malicious: [3, 4, 5, 6, 7, 12, 13, 14],
+    hint: 'A finance user normally hits <strong>email and SharePoint</strong>. Watch for <strong>scanning behavior</strong> (rapid same-port connections to many internal IPs), <strong>LDAP searches</strong> for sensitive groups, and lookups for <strong>admin workstations</strong> they shouldn\'t know exist.',
+    explanation: 'Five SMB connections to sequential internal IPs (10.10.10.1-5) at the same timestamp indicate share enumeration — a finance workstation has no reason to scan the server subnet. The TGS-REQ for <code>host/admin-ws01.corp.local</code> is suspicious because a finance user shouldn\'t be requesting tickets for admin workstations. The two LDAP searches are particularly damning: enumerating all user objects and specifically the Domain Admins group is textbook BloodHound or PowerView reconnaissance. The Kerberos requests for fileservers (rows 8-10) are noisy but could be legitimate share access — they\'re not in the malicious set because we want to focus on the clear behavioral anomalies. Rows 0, 1, 2, and 15 show expected finance-user activity (Outlook, SharePoint DNS).',
+    mitre: [
+      { id: 'T1018',  name: 'Remote System Discovery' },
+      { id: 'T1135',  name: 'Network Share Discovery' },
+      { id: 'T1087.002', name: 'Account Discovery: Domain Account' },
+      { id: 'T1069.002', name: 'Permission Groups Discovery: Domain Groups' },
+    ],
+    detection: [
+      { tool: 'arkime',   label: 'Arkime',       code: 'ip.src == 10.10.20.55 && port.dst == 445 && length < 300' },
+      { tool: 'kibana',   label: 'Kibana (KQL)', code: 'source.ip:"10.10.20.55" AND (destination.port:445 OR ldap.search.filter:*Domain?Admins*)' },
+      { tool: 'suricata', label: 'Suricata',     code: 'alert tcp $HOME_NET any -> $HOME_NET 445 (msg:"SMB sweep behavior - many hosts in short window"; threshold:type both, track by_src, count 5, seconds 30; sid:1000005;)' },
+    ],
+  },
+
+  /* ====== SCN-006 · LATERAL MOVEMENT · WinRM ====== */
+  {
+    id: 'SCN-006',
+    title: 'WinRM Lateral Movement',
+    difficulty: 'HARD',
+    viewType: 'flows',
+    brief: 'Workstation <strong>10.10.20.55</strong> (same finance host from prior alerts) is now talking to other internal hosts on unexpected ports. The team suspects lateral movement. Most of these flows are normal IT operations — identify the malicious lateral movement among the noise.',
+    columns: ['#', 'TIME', 'SRC', 'DST', 'PORT', 'PROTO', 'PACKETS', 'BYTES', 'DUR'],
+    rows: [
+      { time: '14:11:02', src: '10.10.20.55', dst: '10.10.10.20', port: 445,  proto: 'TCP', pkts: 64,  bytes: '12 KB', dur: '2.1s' },
+      { time: '14:11:18', src: '10.10.20.55', dst: '10.10.10.20', port: 5985, proto: 'TCP', pkts: 312, bytes: '184 KB', dur: '8.4s' },
+      { time: '14:11:42', src: '10.10.20.55', dst: '10.10.40.10', port: 443,  proto: 'TCP', pkts: 88,  bytes: '42 KB', dur: '3.2s' },
+      { time: '14:12:08', src: '10.10.20.55', dst: '10.10.10.21', port: 5985, proto: 'TCP', pkts: 298, bytes: '172 KB', dur: '7.8s' },
+      { time: '14:12:31', src: '10.10.50.7',  dst: '10.10.20.55', port: 5985, proto: 'TCP', pkts: 142, bytes: '88 KB', dur: '4.2s' },
+      { time: '14:12:54', src: '10.10.20.55', dst: '10.10.10.22', port: 5985, proto: 'TCP', pkts: 412, bytes: '256 KB', dur: '11.2s' },
+      { time: '14:13:11', src: '10.10.20.55', dst: '10.10.40.10', port: 443,  proto: 'TCP', pkts: 124, bytes: '78 KB', dur: '4.1s' },
+      { time: '14:13:42', src: '10.10.20.55', dst: '10.10.10.23', port: 5985, proto: 'TCP', pkts: 388, bytes: '241 KB', dur: '10.4s' },
+      { time: '14:14:02', src: '10.10.20.55', dst: '10.10.30.50', port: 80,   proto: 'TCP', pkts: 22,  bytes: '8 KB',  dur: '0.8s' },
+      { time: '14:14:21', src: '10.10.20.55', dst: '10.10.10.24', port: 5985, proto: 'TCP', pkts: 422, bytes: '264 KB', dur: '11.8s' },
+    ],
+    malicious: [1, 3, 5, 7, 9],
+    hint: 'WinRM (port <strong>5985</strong>) is legitimate IT tooling — but watch <strong>direction and pattern</strong>. An IT admin host pushing to many endpoints is normal. A finance workstation initiating WinRM to many servers is not.',
+    explanation: 'Five outbound WinRM (5985/tcp) connections from <code>10.10.20.55</code> to sequential internal hosts (<code>10.10.10.20-24</code>) over ~3 minutes — each carrying ~200 KB of data — represent lateral movement via PowerShell Remoting. The finance workstation is initiating these sessions outbound to multiple targets, which is the inverse of legitimate WinRM usage where a few admin hosts push commands to many endpoints. Row 4 (<code>10.10.50.7 → 10.10.20.55:5985</code>) is the pattern of legitimate IT remote management — admin host inbound to a managed endpoint — and is correctly excluded. Rows 0, 2, 6, 8 are normal SMB and HTTPS traffic. The defining tell is direction + repetition: a finance host has no business invoking PSRemoting on five servers in a row.',
+    mitre: [
+      { id: 'T1021.006', name: 'Remote Services: Windows Remote Management' },
+      { id: 'T1570',     name: 'Lateral Tool Transfer' },
+    ],
+    detection: [
+      { tool: 'arkime',   label: 'Arkime',       code: 'ip.src == 10.10.20.55 && port.dst == 5985' },
+      { tool: 'kibana',   label: 'Kibana (KQL)', code: 'source.ip:"10.10.20.55" AND destination.port:(5985 OR 5986)' },
+      { tool: 'suricata', label: 'Suricata',     code: 'alert tcp !$ADMIN_HOSTS any -> $HOME_NET 5985 (msg:"WinRM from non-admin source"; flow:established,to_server; threshold:type both, track by_src, count 3, seconds 300; sid:1000006;)' },
+    ],
+  },
+
+  /* ====== SCN-007 · CREDENTIAL ACCESS · Kerberoasting ====== */
+  {
+    id: 'SCN-007',
+    title: 'Kerberoasting Activity',
+    difficulty: 'HARD',
+    viewType: 'logs',
+    brief: 'Domain controller Kerberos logs from <strong>DC1.corp.local</strong>. Most of this is normal authentication traffic. Identify the requests consistent with Kerberoasting — credential access via service ticket extraction.',
+    rows: [
+      { time: '08:14:02', src: 'kerberos.log', msg: 'TGS-REQ user=alice → cifs/fileserver01 enctype=AES256-CTS-HMAC-SHA1-96' },
+      { time: '08:14:18', src: 'kerberos.log', msg: 'TGS-REQ user=bob → http/intranet enctype=AES256-CTS-HMAC-SHA1-96' },
+      { time: '08:14:34', src: 'kerberos.log', msg: 'TGS-REQ user=svc-backup → MSSQLSvc/sqlprod01:1433 enctype=AES256-CTS-HMAC-SHA1-96' },
+      { time: '08:15:11', src: 'kerberos.log', msg: 'TGS-REQ user=dwilliams → MSSQLSvc/sqldev01:1433 enctype=RC4-HMAC' },
+      { time: '08:15:13', src: 'kerberos.log', msg: 'TGS-REQ user=dwilliams → MSSQLSvc/sqlprod02:1433 enctype=RC4-HMAC' },
+      { time: '08:15:14', src: 'kerberos.log', msg: 'TGS-REQ user=dwilliams → http/jira-svc enctype=RC4-HMAC' },
+      { time: '08:15:15', src: 'kerberos.log', msg: 'TGS-REQ user=dwilliams → http/confluence-svc enctype=RC4-HMAC' },
+      { time: '08:15:17', src: 'kerberos.log', msg: 'TGS-REQ user=dwilliams → MSSQLSvc/finance-db:1433 enctype=RC4-HMAC' },
+      { time: '08:15:19', src: 'kerberos.log', msg: 'TGS-REQ user=dwilliams → cifs/backup-svc enctype=RC4-HMAC' },
+      { time: '08:15:22', src: 'kerberos.log', msg: 'TGS-REQ user=carol → http/sharepoint enctype=AES256-CTS-HMAC-SHA1-96' },
+      { time: '08:15:31', src: 'kerberos.log', msg: 'TGS-REQ user=dwilliams → http/exchange-svc enctype=RC4-HMAC' },
+      { time: '08:16:02', src: 'kerberos.log', msg: 'TGS-REQ user=eve → cifs/fileserver02 enctype=AES256-CTS-HMAC-SHA1-96' },
+      { time: '08:16:18', src: 'kerberos.log', msg: 'TGS-REQ user=svc-monitoring → http/monitor enctype=AES256-CTS-HMAC-SHA1-96' },
+    ],
+    malicious: [3, 4, 5, 6, 7, 8, 10],
+    hint: 'Two patterns to spot. First: the <strong>encryption type</strong> matters — modern domains use AES, but Kerberoasting tools force a weaker algorithm to make ticket cracking faster. Second: a <strong>single user requesting many service tickets</strong> in a short window for accounts they don\'t normally use.',
+    explanation: 'User <code>dwilliams</code> requested 7 service tickets across ~16 seconds for accounts spanning SQL servers, Jira, Confluence, Exchange, and backup services — all using <code>RC4-HMAC</code> encryption. RC4 is the smoking gun: modern AD environments default to AES256, but Kerberoasting tools (Rubeus, Impacket\'s GetUserSPNs.py) explicitly request RC4 because RC4-encrypted service tickets are dramatically faster to crack offline with hashcat. A normal user accumulates service tickets organically across a workday as they access different services — they do not request 7 tickets to unrelated services in 16 seconds. The other rows show legitimate authentication patterns: normal users hitting their usual services, and legitimate service accounts (svc-backup, svc-monitoring) requesting tickets for the resources they\'re configured to manage.',
+    mitre: [
+      { id: 'T1558.003', name: 'Steal or Forge Kerberos Tickets: Kerberoasting' },
+      { id: 'T1078.002', name: 'Valid Accounts: Domain Accounts' },
+    ],
+    detection: [
+      { tool: 'arkime',   label: 'Arkime',       code: 'krb5.etype == "rc4-hmac" && krb5.cname == "dwilliams"' },
+      { tool: 'kibana',   label: 'Kibana (KQL)', code: 'event.dataset:"kerberos" AND kerberos.cipher:"rc4-hmac" AND kerberos.message_type:"TGS-REQ"' },
+      { tool: 'suricata', label: 'Suricata',     code: 'alert tcp $HOME_NET any -> $DOMAIN_CONTROLLERS 88 (msg:"Possible Kerberoasting - RC4 TGS-REQ burst"; flow:to_server; threshold:type both, track by_src, count 5, seconds 60; sid:1000007;)' },
+    ],
+  },
+
+  /* ====== SCN-008 · COLLECTION · Bulk Confluence Access ====== */
+  {
+    id: 'SCN-008',
+    title: 'Bulk Document Collection',
+    difficulty: 'MEDIUM',
+    viewType: 'flows',
+    brief: 'User <strong>10.10.30.42</strong> accessed the internal Confluence wiki at <strong>10.10.40.15</strong>. Their normal pattern is 5-15 page views per session. Identify activity consistent with bulk content harvesting.',
+    columns: ['#', 'TIME', 'SRC', 'DST', 'PORT', 'PROTO', 'PACKETS', 'BYTES', 'DUR'],
+    rows: [
+      { time: '09:02:14', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 22,   bytes: '14 KB',   dur: '0.8s' },
+      { time: '09:02:52', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 18,   bytes: '11 KB',   dur: '0.6s' },
+      { time: '09:04:02', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 28,   bytes: '18 KB',   dur: '1.1s' },
+      { time: '09:18:33', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 1842, bytes: '8.4 MB',  dur: '14.2s' },
+      { time: '09:18:49', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 1788, bytes: '8.1 MB',  dur: '13.8s' },
+      { time: '09:19:04', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 1922, bytes: '8.7 MB',  dur: '14.6s' },
+      { time: '09:19:21', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 1855, bytes: '8.3 MB',  dur: '14.1s' },
+      { time: '09:19:38', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 1798, bytes: '8.2 MB',  dur: '13.9s' },
+      { time: '09:21:11', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 24,   bytes: '15 KB',   dur: '0.9s' },
+      { time: '09:24:42', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 32,   bytes: '21 KB',   dur: '1.2s' },
+    ],
+    malicious: [3, 4, 5, 6, 7],
+    hint: 'Compare bytes and packets across sessions. Normal wiki browsing pulls KBs per page. <strong>Sustained MB-scale transfers</strong> at regular intervals look more like an automated scraper or API export.',
+    explanation: 'Five sessions (rows 3-7) show a consistent pattern: ~8 MB transferred per connection, ~1800 packets, ~14 seconds duration, occurring roughly 15 seconds apart. This signature is consistent with an attacker using the Confluence REST API or a scraping tool to bulk-export pages — possibly via <code>/rest/api/content?expand=body.storage&limit=100</code>. Normal interactive wiki browsing (rows 0-2, 8-9) shows ~15-20 KB per page view with multi-second gaps between requests as the user reads. The 5x volume jump and rapid cadence strongly indicate automated collection. Whether this is a malicious insider, compromised credentials, or sanctioned bulk export is a separate investigation — but the pattern alone warrants escalation.',
+    mitre: [
+      { id: 'T1213.001', name: 'Data from Information Repositories: Confluence' },
+      { id: 'T1119',     name: 'Automated Collection' },
+    ],
+    detection: [
+      { tool: 'arkime',   label: 'Arkime',       code: 'ip.src == 10.10.30.42 && ip.dst == 10.10.40.15 && databytes > 5000000' },
+      { tool: 'kibana',   label: 'Kibana (KQL)', code: 'source.ip:"10.10.30.42" AND destination.ip:"10.10.40.15" AND network.bytes > 5000000' },
+      { tool: 'suricata', label: 'Suricata',     code: 'alert tcp $HOME_NET any -> $WIKI_SERVERS 443 (msg:"Bulk Confluence egress - large repeated transfer"; flow:established,from_server; threshold:type both, track by_src, count 3, seconds 120; sid:1000008;)' },
+    ],
+  },
+
+  /* ====== SCN-009 · EXFILTRATION · Cloud Storage Upload ====== */
+  {
+    id: 'SCN-009',
+    title: 'Exfiltration to Cloud Storage',
+    difficulty: 'HARD',
+    viewType: 'flows',
+    brief: 'Workstation <strong>10.10.30.42</strong> network activity over the past hour. Cloud storage usage is permitted at this organization, so legitimate uploads will be present. Identify the flows consistent with data exfiltration — pay attention to <strong>volume direction</strong> (upload vs download), <strong>destination service</strong>, and <strong>timing</strong>.',
+    columns: ['#', 'TIME', 'SRC', 'DST', 'PORT', 'PROTO', 'PACKETS', 'BYTES', 'DUR'],
+    rows: [
+      { time: '17:42:11', src: '10.10.30.42', dst: 'onedrive.live.com',     port: 443, proto: 'TCP', pkts: 88,    bytes: '180 KB ↓', dur: '2.1s' },
+      { time: '17:43:42', src: '10.10.30.42', dst: 'teams.microsoft.com',   port: 443, proto: 'TCP', pkts: 124,   bytes: '88 KB ↑',  dur: '1.8s' },
+      { time: '17:48:02', src: '10.10.30.42', dst: 'onedrive.live.com',     port: 443, proto: 'TCP', pkts: 942,   bytes: '4.2 MB ↑', dur: '8.4s' },
+      { time: '18:02:18', src: '10.10.30.42', dst: 'mega.nz',                port: 443, proto: 'TCP', pkts: 14282, bytes: '142 MB ↑', dur: '184s' },
+      { time: '18:04:52', src: '10.10.30.42', dst: 'github.com',             port: 443, proto: 'TCP', pkts: 22,    bytes: '14 KB ↓',  dur: '0.8s' },
+      { time: '18:08:34', src: '10.10.30.42', dst: 'pastebin.com',           port: 443, proto: 'TCP', pkts: 88,    bytes: '420 KB ↑', dur: '3.2s' },
+      { time: '18:14:11', src: '10.10.30.42', dst: 'discord.com',            port: 443, proto: 'TCP', pkts: 142,   bytes: '88 KB ↑',  dur: '2.4s' },
+      { time: '18:18:42', src: '10.10.30.42', dst: 'discord-cdn-uploads.net',port: 443, proto: 'TCP', pkts: 6842,  bytes: '88 MB ↑',  dur: '94s' },
+      { time: '18:22:14', src: '10.10.30.42', dst: 'onedrive.live.com',     port: 443, proto: 'TCP', pkts: 244,   bytes: '380 KB ↑', dur: '4.2s' },
+      { time: '18:32:42', src: '10.10.30.42', dst: 'bunkr.la',               port: 443, proto: 'TCP', pkts: 8842,  bytes: '112 MB ↑', dur: '142s' },
+      { time: '18:48:11', src: '10.10.30.42', dst: 'teams.microsoft.com',   port: 443, proto: 'TCP', pkts: 312,   bytes: '142 KB ↑', dur: '4.8s' },
+    ],
+    malicious: [3, 5, 7, 9],
+    hint: 'Three signals to weigh together. <strong>Service reputation</strong>: corporate-sanctioned (OneDrive, Teams, GitHub) vs exfil-friendly (Mega, Bunkr, Pastebin, anonymous Discord uploads). <strong>Volume direction</strong>: large outbound (↑) is more suspicious than inbound. <strong>Sheer scale</strong>: 100+ MB uploads outside normal sanctioned services warrant alerting.',
+    explanation: 'Four uploads to non-sanctioned services account for the exfiltration pattern. Row 3: 142 MB to <code>mega.nz</code> — Mega is heavily abused for data theft because of its end-to-end encryption and anonymous accounts. Row 5: 420 KB to <code>pastebin.com</code> — small but pastebin is a known channel for stolen credentials and small documents. Row 7: 88 MB to <code>discord-cdn-uploads.net</code> — note the fake-looking domain mimicking Discord\'s real CDN; legitimate Discord uploads go to <code>cdn.discordapp.com</code>. Row 9: 112 MB to <code>bunkr.la</code> — anonymous file host with a strong exfil reputation. The OneDrive upload (row 2, 4.2 MB) and Teams/GitHub traffic are corporate-sanctioned and within normal usage patterns. Note the broader story: this user previously triggered the bulk Confluence collection in SCN-008. The collection-then-exfil pipeline across two scenarios is the hunter\'s payoff.',
+    mitre: [
+      { id: 'T1567.002', name: 'Exfiltration to Cloud Storage' },
+      { id: 'T1048.003', name: 'Exfiltration Over Unencrypted Non-C2 Protocol' },
+    ],
+    detection: [
+      { tool: 'arkime',   label: 'Arkime',       code: 'http.host == "*.mega.nz" || http.host == "*.bunkr.la" || http.host == "pastebin.com"' },
+      { tool: 'kibana',   label: 'Kibana (KQL)', code: 'destination.domain:(*.mega.nz OR *.bunkr.la OR pastebin.com OR discord-cdn-uploads.net) AND network.bytes > 1000000' },
+      { tool: 'suricata', label: 'Suricata',     code: 'alert tls $HOME_NET any -> $EXTERNAL_NET 443 (msg:"Outbound TLS to known exfil-friendly host"; tls.sni; content:"mega.nz"; nocase; sid:1000009;)' },
+    ],
+  }
+];
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const state = {
+  mode: 'tutorial',
+  scenarioIdx: 0,
+  selected: new Set(),
+  revealed: false,
+  hintShown: false,
+  activeTab: 'analysis',
+  totalScore: 0,
+  totalHits: 0,
+  totalMisses: 0,
+  totalFps: 0,
+  results: {},  // {scenarioIdx: {score, hits, misses, fps}}
+};
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
+
+function escapeHtml(s) {
+  // We use innerHTML for our authored content, so this is for safety on dynamic strings.
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function render() {
+  renderHeader();
+  renderSidebar();
+
+  const main = $('#main');
+  if (state.scenarioIdx >= SCENARIOS.length) {
+    main.innerHTML = renderComplete();
+    bindComplete();
+    return;
+  }
+
+  const sc = SCENARIOS[state.scenarioIdx];
+  main.innerHTML = `
+    ${renderScenarioHeader(sc)}
+    <div class="sc-body">
+      <div class="sc-brief">${sc.brief}</div>
+      ${state.mode === 'tutorial' && !state.revealed ? renderInstructions() : ''}
+      ${state.hintShown && state.mode === 'tutorial' && !state.revealed ? renderHint(sc) : ''}
+    </div>
+    ${sc.viewType === 'flows' ? renderFlowsTable(sc) : renderLogStream(sc)}
+    ${renderControls(sc)}
+    ${state.revealed ? renderReveal(sc) : ''}
+  `;
+  bindRows(sc);
+  bindControls(sc);
+  if (state.revealed) bindRevealTabs(sc);
+}
+
+function renderHeader() {
+  $('#stat-scenario').textContent = `${Math.min(state.scenarioIdx + 1, SCENARIOS.length)}/${SCENARIOS.length}`;
+  $('#stat-score').textContent = state.totalScore;
+  $('#stat-hits').textContent = state.totalHits;
+  $('#stat-misses').textContent = state.totalMisses;
+}
+
+function renderSidebar() {
+  const toc = $('#toc');
+  toc.innerHTML = SCENARIOS.map((sc, i) => {
+    const result = state.results[i];
+    const isActive = i === state.scenarioIdx;
+    const isDone = !!result;
+    let mark = '';
+    if (isDone) {
+      const cls = result.score >= 80 ? 'pass' : result.score >= 50 ? 'partial' : 'fail';
+      mark = `<span class="toc-mark ${cls}">${result.score}</span>`;
+    } else if (isActive) {
+      mark = `<span class="toc-mark">▸</span>`;
+    }
+    return `
+      <div class="toc-item ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}" data-idx="${i}">
+        <span class="toc-id">${sc.id}</span>
+        <span class="toc-name">${sc.title}</span>
+        ${mark}
+      </div>
+    `;
+  }).join('');
+
+  $$('.toc-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const idx = parseInt(el.dataset.idx, 10);
+      // Only allow nav to current/done scenarios
+      if (idx > state.scenarioIdx) return;
+      state.scenarioIdx = idx;
+      state.selected.clear();
+      state.revealed = !!state.results[idx];
+      state.hintShown = false;
+      state.activeTab = 'analysis';
+      // If revisiting a done scenario, repopulate selected with what they picked? Skip for v1 — just show explanation fresh.
+      if (state.revealed) state.selected = new Set(SCENARIOS[idx].malicious);
+      render();
+    });
+  });
+
+  // Run stats
+  const done = Object.keys(state.results).length;
+  $('#side-score').textContent = state.totalScore;
+  $('#side-avg').textContent = done ? Math.round(state.totalScore / done) : '—';
+  $('#side-tp').textContent = state.totalHits;
+  $('#side-miss').textContent = state.totalMisses;
+  $('#side-fp').textContent = state.totalFps;
+}
+
+function renderScenarioHeader(sc) {
+  const diffClass = `diff-${sc.difficulty.toLowerCase()}`;
+  return `
+    <div class="sc-header">
+      <span class="sc-id">${sc.id}</span>
+      <span class="sc-name">${sc.title}</span>
+      <span class="diff-badge ${diffClass}">${sc.difficulty}</span>
+      <span class="view-tag">${sc.viewType === 'flows' ? 'flow.records' : 'log.stream'}</span>
+    </div>
+  `;
+}
+
+function renderInstructions() {
+  return `
+    <div class="callout">
+      <span class="callout-label">▸ Instructions</span>
+      Click rows you believe are malicious. Press <strong>Submit</strong> to evaluate.
+      Use <strong>Hint</strong> if you're stuck — disabled in challenge mode.
+    </div>
+  `;
+}
+
+function renderHint(sc) {
+  return `
+    <div class="callout hint">
+      <span class="callout-label">▸ Analyst Hint</span>
+      ${sc.hint}
+    </div>
+  `;
+}
+
+function renderFlowsTable(sc) {
+  const rows = sc.rows.map((r, i) => {
+    const cls = rowClass(i, sc);
+    const mark = state.selected.has(i) && !state.revealed ? '▸' : '';
+    return `
+      <tr data-idx="${i}" class="${cls}">
+        <td class="col-idx"><span class="row-mark">${mark}</span>${String(i + 1).padStart(2, '0')}</td>
+        <td>${r.time}</td>
+        <td>${r.src}</td>
+        <td>${r.dst}</td>
+        <td class="col-port">${r.port}</td>
+        <td class="col-proto">${r.proto}</td>
+        <td>${r.pkts}</td>
+        <td>${r.bytes}</td>
+        <td>${r.dur}</td>
+      </tr>`;
+  }).join('');
+
+  return `
+    <div class="data-view">
+      <div class="code-hdr">
+        <span class="code-lang">flow.records</span>
+        <span class="code-meta">${sc.rows.length} sessions · click rows to flag</span>
+      </div>
+      <table class="flows">
+        <thead><tr>${sc.columns.map(c => `<th>${c}</th>`).join('')}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderLogStream(sc) {
+  const lines = sc.rows.map((r, i) => {
+    const cls = rowClass(i, sc);
+    const mark = state.selected.has(i) && !state.revealed ? '▸' : '';
+    return `
+      <div class="log-line ${cls}" data-idx="${i}">
+        <span class="log-idx">${mark}${String(i + 1).padStart(2, '0')}</span>
+        <span class="log-time">${r.time}</span>
+        <span class="log-source">${r.src}</span>
+        <span class="log-msg">${r.msg}</span>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="data-view">
+      <div class="code-hdr">
+        <span class="code-lang">log.stream</span>
+        <span class="code-meta">${sc.rows.length} events · click lines to flag</span>
+      </div>
+      <div class="log-stream">${lines}</div>
+    </div>
+  `;
+}
+
+function rowClass(idx, sc) {
+  if (!state.revealed) return state.selected.has(idx) ? 'selected' : '';
+  const isMal = sc.malicious.includes(idx);
+  const isSel = state.selected.has(idx);
+  if (isMal && isSel) return 'correct';
+  if (isMal && !isSel) return 'missed';
+  if (!isMal && isSel) return 'fp';
+  return '';
+}
+
+function renderControls(sc) {
+  if (state.revealed) {
+    return `
+      <div class="controls">
+        <span class="sel-count">▸ Analysis submitted · review findings below</span>
+      </div>
+    `;
+  }
+  const showHint = state.mode === 'tutorial' && !state.hintShown;
+  return `
+    <div class="controls">
+      <span class="sel-count">▸ Selected: <strong>${state.selected.size}</strong> ${state.selected.size === 1 ? 'flow' : 'flows'}</span>
+      <div class="btn-group">
+        ${showHint ? '<button class="btn btn-warn" id="btn-hint">▸ Hint</button>' : ''}
+        <button class="btn" id="btn-clear" ${state.selected.size === 0 ? 'disabled' : ''}>↻ Clear</button>
+        <button class="btn btn-primary" id="btn-submit" ${state.selected.size === 0 ? 'disabled' : ''}>▸ Submit Analysis</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderReveal(sc) {
+  const r = scoreScenario(sc);
+  const tone = r.score >= 80 ? '' : r.score >= 50 ? 'partial' : 'fail';
+  const verdict = r.score >= 80 ? 'CONFIRMED' : r.score >= 50 ? 'PARTIAL' : 'INCONCLUSIVE';
+  const vClass = r.score >= 80 ? 'v-confirmed' : r.score >= 50 ? 'v-partial' : 'v-incon';
+
+  return `
+    <div class="reveal ${tone}">
+      <div class="reveal-hdr">
+        <div class="reveal-score">${r.score}<small>/100</small></div>
+        <span class="verdict ${vClass}">▸ ${verdict}</span>
+        <div class="reveal-stats">
+          <span class="s-hit">✓ ${r.hits} HITS</span>
+          <span class="s-miss">✗ ${r.misses} MISSED</span>
+          <span class="s-fp">! ${r.fps} FALSE POS</span>
+        </div>
+      </div>
+
+      <div class="tab-bar">
+        <button class="dtab ${state.activeTab === 'analysis' ? 'active' : ''}" data-tab="analysis">▸ Analysis</button>
+        <button class="dtab t-mit ${state.activeTab === 'mitre' ? 'active' : ''}" data-tab="mitre">▸ MITRE</button>
+        <button class="dtab t-det ${state.activeTab === 'detect' ? 'active' : ''}" data-tab="detect">▸ Detection</button>
+      </div>
+
+      <div class="tab-panel ${state.activeTab === 'analysis' ? 'active' : ''}" data-panel="analysis">
+        <p>${sc.explanation}</p>
+      </div>
+
+      <div class="tab-panel ${state.activeTab === 'mitre' ? 'active' : ''}" data-panel="mitre">
+        <div class="mitre-list">
+          ${sc.mitre.map(m => `
+            <div class="mitre-tag">
+              <span class="mitre-id">${m.id}</span>
+              <span class="mitre-name">${m.name}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="tab-panel ${state.activeTab === 'detect' ? 'active' : ''}" data-panel="detect">
+        <p style="color:var(--text3);font-size:11px;margin-bottom:12px;">Paste-ready detection logic. Variables like <code>$HOME_NET</code> are placeholders — replace with values from your environment.</p>
+        ${sc.detection.map((d, i) => `
+          <div class="detect-block">
+            <div class="detect-hdr">
+              <span class="detect-lang l-${d.tool === 'arkime' ? 'ark' : d.tool === 'kibana' ? 'kib' : 'sur'}">${d.label}</span>
+              <button class="copy-btn" data-copy="d-${i}">⧉ Copy</button>
+            </div>
+            <div class="detect-body" id="d-${i}">${escapeHtml(d.code)}</div>
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="next-bar">
+        <button class="btn btn-primary" id="btn-next">
+          ▸ ${state.scenarioIdx + 1 < SCENARIOS.length ? 'Next Scenario' : 'Finish Run'}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function renderComplete() {
+  const max = SCENARIOS.length * 100;
+  const pct = Math.round((state.totalScore / max) * 100);
+  const tone = pct >= 80 ? '' : pct >= 60 ? 'partial' : 'fail';
+  const verdict = pct >= 80 ? 'EXCELLENT — ANALYST GRADE'
+                : pct >= 60 ? 'PROFICIENT — KEEP HUNTING'
+                : pct >= 40 ? 'DEVELOPING — REVIEW MISSES'
+                            : 'NEEDS PRACTICE — RERUN TUTORIAL';
+
+  return `
+    <div class="complete">
+      <h2>▸ RUN COMPLETE</h2>
+      <div class="sub">${SCENARIOS.length} scenario${SCENARIOS.length !== 1 ? 's' : ''} reviewed · session terminated</div>
+      <div class="final-score ${tone}">${pct}%</div>
+      <div class="final-verdict">${verdict}</div>
+      <div class="summary-grid">
+        <div class="summary-cell">
+          <div class="lbl">True Positives</div>
+          <div class="val" style="color:var(--green)">${state.totalHits}</div>
+        </div>
+        <div class="summary-cell">
+          <div class="lbl">Missed</div>
+          <div class="val" style="color:var(--red)">${state.totalMisses}</div>
+        </div>
+        <div class="summary-cell">
+          <div class="lbl">False Positives</div>
+          <div class="val" style="color:var(--amber)">${state.totalFps}</div>
+        </div>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="btn-restart">▸ New Run</button>
+        <a href="https://hunt.6b74.dev" class="btn">▸ Open Hunt Reference</a>
+      </div>
+    </div>
+  `;
+}
+
+/* ============================================================
+   SCORING
+   ============================================================ */
+function scoreScenario(sc) {
+  const malSet = new Set(sc.malicious);
+  let hits = 0, misses = 0, fps = 0;
+  for (const idx of state.selected) {
+    if (malSet.has(idx)) hits++;
+    else fps++;
+  }
+  for (const idx of malSet) {
+    if (!state.selected.has(idx)) misses++;
+  }
+  const perItem = 100 / sc.malicious.length;
+  const raw = hits * perItem - fps * (perItem * 0.5);
+  return { hits, misses, fps, score: Math.max(0, Math.min(100, Math.round(raw))) };
+}
+
+/* ============================================================
+   BINDINGS
+   ============================================================ */
+function bindRows(sc) {
+  const sel = sc.viewType === 'flows' ? 'tbody tr' : '.log-line';
+  $$(sel).forEach(el => {
+    el.addEventListener('click', () => {
+      if (state.revealed) return;
+      const idx = parseInt(el.dataset.idx, 10);
+      if (state.selected.has(idx)) state.selected.delete(idx);
+      else state.selected.add(idx);
+      render();
+    });
+  });
+}
+
+function bindControls(sc) {
+  const hint = $('#btn-hint');
+  if (hint) hint.addEventListener('click', () => { state.hintShown = true; render(); });
+
+  const clear = $('#btn-clear');
+  if (clear) clear.addEventListener('click', () => { state.selected.clear(); render(); });
+
+  const submit = $('#btn-submit');
+  if (submit) submit.addEventListener('click', () => {
+    state.revealed = true;
+    state.activeTab = 'analysis';
+    const r = scoreScenario(sc);
+    state.totalScore += r.score;
+    state.totalHits += r.hits;
+    state.totalMisses += r.misses;
+    state.totalFps += r.fps;
+    state.results[state.scenarioIdx] = r;
+    render();
+  });
+
+  const next = $('#btn-next');
+  if (next) next.addEventListener('click', () => {
+    state.scenarioIdx++;
+    state.selected.clear();
+    state.revealed = false;
+    state.hintShown = false;
+    state.activeTab = 'analysis';
+    render();
+  });
+}
+
+function bindRevealTabs(sc) {
+  $$('.dtab').forEach(t => {
+    t.addEventListener('click', () => {
+      state.activeTab = t.dataset.tab;
+      $$('.dtab').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      $$('.tab-panel').forEach(p => {
+        p.classList.toggle('active', p.dataset.panel === state.activeTab);
+      });
+    });
+  });
+
+  $$('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = $('#' + btn.dataset.copy);
+      if (!target) return;
+      navigator.clipboard.writeText(target.textContent).then(() => {
+        btn.textContent = '✓ Copied';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = '⧉ Copy';
+          btn.classList.remove('copied');
+        }, 1500);
+      });
+    });
+  });
+}
+
+function bindComplete() {
+  const r = $('#btn-restart');
+  if (r) r.addEventListener('click', () => resetRun());
+}
+
+function resetRun() {
+  state.scenarioIdx = 0;
+  state.selected.clear();
+  state.revealed = false;
+  state.hintShown = false;
+  state.activeTab = 'analysis';
+  state.totalScore = 0;
+  state.totalHits = 0;
+  state.totalMisses = 0;
+  state.totalFps = 0;
+  state.results = {};
+  render();
+}
+
+/* ============================================================
+   MODE + RESET
+   ============================================================ */
+$$('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $$('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.mode = btn.dataset.mode;
+    state.hintShown = false;
+    render();
+  });
+});
+
+$('#btn-reset').addEventListener('click', () => {
+  if (Object.keys(state.results).length > 0 || state.selected.size > 0) {
+    if (!confirm('Reset run? All progress will be lost.')) return;
+  }
+  resetRun();
+});
+
+/* ============================================================
+   BOOT SEQUENCE
+   ============================================================ */
+const BOOT_LINES = [
+  { t: 0,   txt: '[6B74-DETECT] cold boot · session id 0x4A2F', cls: '' },
+  { t: 80,  txt: 'loading scenario index ........................', cls: '' },
+  { t: 220, txt: '  ▸ ' + SCENARIOS.length + ' scenario(s) registered', cls: 'boot-ok' },
+  { t: 320, txt: 'mounting flow.records ........................', cls: '' },
+  { t: 460, txt: '  ▸ OK', cls: 'boot-ok' },
+  { t: 540, txt: 'mounting log.stream ..........................', cls: '' },
+  { t: 680, txt: '  ▸ OK', cls: 'boot-ok' },
+  { t: 760, txt: 'tuning detection rules .......................', cls: '' },
+  { t: 920, txt: '  ▸ OK · MITRE ATT&CK v15 mapped', cls: 'boot-ok' },
+  { t: 1020, txt: 'arming behavioral analytics ..................', cls: '' },
+  { t: 1180, txt: '  ▸ caffeine levels: critical', cls: 'boot-warn' },
+  { t: 1280, txt: '', cls: '' },
+  { t: 1340, txt: '▸ session ready. happy hunting.', cls: 'boot-ok' },
+];
+
+function runBoot() {
+  const inner = document.getElementById('boot-inner');
+  // If user has visited before this run, skip the boot
+  if (sessionStorage.getItem('sta_booted') === '1') {
+    document.getElementById('boot').style.display = 'none';
+    return Promise.resolve();
+  }
+  return new Promise(resolve => {
+    BOOT_LINES.forEach(line => {
+      setTimeout(() => {
+        const div = document.createElement('div');
+        div.className = 'boot-line ' + line.cls;
+        div.textContent = line.txt || '\u00a0';
+        inner.appendChild(div);
+        inner.scrollTop = inner.scrollHeight;
+      }, line.t);
+    });
+    setTimeout(() => {
+      const cursor = document.createElement('span');
+      cursor.className = 'boot-cursor';
+      inner.lastChild.appendChild(cursor);
+    }, BOOT_LINES[BOOT_LINES.length - 1].t + 50);
+    setTimeout(() => {
+      document.getElementById('boot').classList.add('gone');
+      sessionStorage.setItem('sta_booted', '1');
+      setTimeout(resolve, 350);
+    }, BOOT_LINES[BOOT_LINES.length - 1].t + 700);
+  });
+}
+
+/* INIT */
+runBoot().then(render);
+</script>
+</body>
+</html>
