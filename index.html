@@ -27,7 +27,7 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;line-height:1.6;min-height:100vh;position:relative}
 
-/* Subtle CRT scanlines — much lighter than v1 */
+/* Subtle CRT scanlines - much lighter than v1 */
 body::before{
   content:'';position:fixed;inset:0;pointer-events:none;z-index:300;
   background:repeating-linear-gradient(0deg,transparent 0,transparent 2px,rgba(126,231,135,.012) 2px,rgba(126,231,135,.012) 3px);
@@ -294,7 +294,7 @@ table.flows .col-proto{color:var(--purple)}
     <hr class="sidebar-divider">
     <div class="sidebar-title">▸ Run Stats</div>
     <div class="sidebar-stat"><span>Total Score</span><strong id="side-score">0</strong></div>
-    <div class="sidebar-stat"><span>Avg / Scenario</span><strong id="side-avg">—</strong></div>
+    <div class="sidebar-stat"><span>Avg / Scenario</span><strong id="side-avg">-</strong></div>
     <div class="sidebar-stat"><span>True Positives</span><strong id="side-tp" style="color:var(--green)">0</strong></div>
     <div class="sidebar-stat"><span>Missed</span><strong id="side-miss" style="color:var(--red)">0</strong></div>
     <div class="sidebar-stat"><span>False Positives</span><strong id="side-fp" style="color:var(--amber)">0</strong></div>
@@ -351,8 +351,8 @@ const SCENARIOS = [
       { time: '14:12:47', src: '10.0.4.22', dst: '185.220.101.42', port: 443, proto: 'TCP', pkts: 8, bytes: '1.4 KB', dur: '0.4s' },
     ],
     malicious: [1, 3, 5, 7, 9, 11],
-    hint: 'Look at <strong>timing</strong> and <strong>size</strong>. Legitimate user traffic is bursty and irregular. Beacons are mechanical — same destination, same payload size, same interval.',
-    explanation: 'Six flows to <code>185.220.101.42</code> occur at exactly 2-minute intervals (14:02:47, 14:04:47, 14:06:47…), each transferring an identical 1.4 KB payload in 8 packets. This is textbook C2 beaconing: a regular, low-volume callback to check for operator instructions. The other flows show normal user-driven variability in size and timing. The destination IP also belongs to a known Tor exit node range — another red flag.',
+    hint: 'Look at <strong>timing</strong> and <strong>size</strong>. Legitimate user traffic is bursty and irregular. Beacons are mechanical - same destination, same payload size, same interval.',
+    explanation: 'Six flows to <code>185.220.101.42</code> occur at exactly 2-minute intervals (14:02:47, 14:04:47, 14:06:47…), each transferring an identical 1.4 KB payload in 8 packets. This is textbook C2 beaconing: a regular, low-volume callback to check for operator instructions. The other flows show normal user-driven variability in size and timing. The destination IP also belongs to a known Tor exit node range - another red flag.',
     mitre: [
       { id: 'T1071.001', name: 'Application Layer Protocol: Web Protocols' },
       { id: 'T1573', name: 'Encrypted Channel' },
@@ -387,8 +387,8 @@ const SCENARIOS = [
       { time: '09:12:08', src: 'dns.log', msg: '10.0.4.51 → query A fonts.gstatic.com' },
     ],
     malicious: [2, 4, 6, 8, 11],
-    hint: '<strong>TXT record queries</strong> are uncommon for normal user browsing. Look at the <strong>structure</strong> of subdomain labels — random-looking strings can be encoded payloads.',
-    explanation: 'Five TXT-record queries to subdomains of <code>tunnel-svc.io</code> contain high-entropy, randomized labels (e.g., <code>a8f3k9.s2bjx7.q1mn4z</code>) — characteristic of DNS tunneling, where data is encoded into subdomain names and exfiltrated as DNS queries. The TXT response type is favored because it returns arbitrary strings, providing a bidirectional covert channel. Legitimate user browsing rarely generates TXT lookups, and never with this kind of randomized label structure at sustained intervals.',
+    hint: '<strong>TXT record queries</strong> are uncommon for normal user browsing. Look at the <strong>structure</strong> of subdomain labels - random-looking strings can be encoded payloads.',
+    explanation: 'Five TXT-record queries to subdomains of <code>tunnel-svc.io</code> contain high-entropy, randomized labels (e.g., <code>a8f3k9.s2bjx7.q1mn4z</code>) - characteristic of DNS tunneling, where data is encoded into subdomain names and exfiltrated as DNS queries. The TXT response type is favored because it returns arbitrary strings, providing a bidirectional covert channel. Legitimate user browsing rarely generates TXT lookups, and never with this kind of randomized label structure at sustained intervals.',
     mitre: [
       { id: 'T1071.004', name: 'Application Layer Protocol: DNS' },
       { id: 'T1048.003', name: 'Exfiltration over Unencrypted Non-C2 Protocol' },
@@ -426,8 +426,8 @@ const SCENARIOS = [
       { time: '03:16:11', src: '203.0.113.99', dst: '198.51.100.20', port: 80,   proto: 'TCP', pkts: 22,  bytes: '14 KB',  dur: '1.2s' },
     ],
     malicious: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-    hint: 'Look for a single source attempting many <strong>different ports</strong> in rapid succession. Tiny packet counts and minimal bytes are a tell — the scanner is testing for open services, not transferring data.',
-    explanation: 'Source <code>198.18.42.7</code> issued 11 connection attempts to sequential well-known service ports (21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 3389) within ~2 seconds, each with only 2-4 packets and minimal bytes. This is a classic TCP port sweep — the attacker is probing for open services to identify the attack surface. Real user traffic to the same host would target a single service (usually 80/443) with a sustained data exchange. Rows 0, 12, and 13 show normal HTTPS sessions with healthy byte counts and durations.',
+    hint: 'Look for a single source attempting many <strong>different ports</strong> in rapid succession. Tiny packet counts and minimal bytes are a tell - the scanner is testing for open services, not transferring data.',
+    explanation: 'Source <code>198.18.42.7</code> issued 11 connection attempts to sequential well-known service ports (21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 3389) within ~2 seconds, each with only 2-4 packets and minimal bytes. This is a classic TCP port sweep - the attacker is probing for open services to identify the attack surface. Real user traffic to the same host would target a single service (usually 80/443) with a sustained data exchange. Rows 0, 12, and 13 show normal HTTPS sessions with healthy byte counts and durations.',
     mitre: [
       { id: 'T1595.001', name: 'Active Scanning: Scanning IP Blocks' },
       { id: 'T1046',     name: 'Network Service Discovery' },
@@ -464,7 +464,7 @@ const SCENARIOS = [
     ],
     malicious: [3, 4, 6, 9, 12],
     hint: 'URL-decode mentally as you scan. Look for <strong>SQL syntax</strong> (<code>UNION</code>, <code>OR 1=1</code>), <strong>directory traversal</strong> (<code>../</code>), and unusual <strong>user-agents</strong> like <code>sqlmap</code> or raw <code>curl</code>. 403/500 status codes also flag suspicious activity.',
-    explanation: 'Five requests from <code>203.0.113.77</code> show clear exploitation attempts. Decoded payloads: row 3 is SQL injection (<code>id=42\' OR 1=1--</code>), row 4 is a UNION-based SQLi extracting credentials (<code>UNION SELECT null,username,password FROM users</code>), row 6 attempts a destructive <code>DROP TABLE</code>, row 9 is a path traversal trying to read <code>/etc/passwd</code>, and row 12 attempts to upload a PHP webshell. The user-agents <code>curl/7.81.0</code> and <code>sqlmap/1.7.2</code> are dead giveaways — sqlmap is an automated SQL injection tool, and no real user browses with raw curl. The other requests from <code>198.51.100.5</code> show normal user behavior with a browser UA.',
+    explanation: 'Five requests from <code>203.0.113.77</code> show clear exploitation attempts. Decoded payloads: row 3 is SQL injection (<code>id=42\' OR 1=1--</code>), row 4 is a UNION-based SQLi extracting credentials (<code>UNION SELECT null,username,password FROM users</code>), row 6 attempts a destructive <code>DROP TABLE</code>, row 9 is a path traversal trying to read <code>/etc/passwd</code>, and row 12 attempts to upload a PHP webshell. The user-agents <code>curl/7.81.0</code> and <code>sqlmap/1.7.2</code> are dead giveaways - sqlmap is an automated SQL injection tool, and no real user browses with raw curl. The other requests from <code>198.51.100.5</code> show normal user behavior with a browser UA.',
     mitre: [
       { id: 'T1190', name: 'Exploit Public-Facing Application' },
       { id: 'T1505.003', name: 'Server Software Component: Web Shell' },
@@ -482,7 +482,7 @@ const SCENARIOS = [
     title: 'Internal Network Enumeration',
     difficulty: 'MEDIUM',
     viewType: 'logs',
-    brief: 'Zeek logs from a finance department workstation <strong>10.10.20.55</strong> after the user reported "the computer is being weird." Identify activity inconsistent with normal endpoint behavior — what does this user have no business doing?',
+    brief: 'Zeek logs from a finance department workstation <strong>10.10.20.55</strong> after the user reported "the computer is being weird." Identify activity inconsistent with normal endpoint behavior - what does this user have no business doing?',
     rows: [
       { time: '13:02:11', src: 'http.log',  msg: '10.10.20.55 → outlook.office365.com GET /owa/' },
       { time: '13:02:34', src: 'dns.log',   msg: '10.10.20.55 → query A sharepoint.example.com' },
@@ -503,7 +503,7 @@ const SCENARIOS = [
     ],
     malicious: [3, 4, 5, 6, 7, 12, 13, 14],
     hint: 'A finance user normally hits <strong>email and SharePoint</strong>. Watch for <strong>scanning behavior</strong> (rapid same-port connections to many internal IPs), <strong>LDAP searches</strong> for sensitive groups, and lookups for <strong>admin workstations</strong> they shouldn\'t know exist.',
-    explanation: 'Five SMB connections to sequential internal IPs (10.10.10.1-5) at the same timestamp indicate share enumeration — a finance workstation has no reason to scan the server subnet. The TGS-REQ for <code>host/admin-ws01.corp.local</code> is suspicious because a finance user shouldn\'t be requesting tickets for admin workstations. The two LDAP searches are particularly damning: enumerating all user objects and specifically the Domain Admins group is textbook BloodHound or PowerView reconnaissance. The Kerberos requests for fileservers (rows 8-10) are noisy but could be legitimate share access — they\'re not in the malicious set because we want to focus on the clear behavioral anomalies. Rows 0, 1, 2, and 15 show expected finance-user activity (Outlook, SharePoint DNS).',
+    explanation: 'Five SMB connections to sequential internal IPs (10.10.10.1-5) at the same timestamp indicate share enumeration - a finance workstation has no reason to scan the server subnet. The TGS-REQ for <code>host/admin-ws01.corp.local</code> is suspicious because a finance user shouldn\'t be requesting tickets for admin workstations. The two LDAP searches are particularly damning: enumerating all user objects and specifically the Domain Admins group is textbook BloodHound or PowerView reconnaissance. The Kerberos requests for fileservers (rows 8-10) are noisy but could be legitimate share access - they\'re not in the malicious set because we want to focus on the clear behavioral anomalies. Rows 0, 1, 2, and 15 show expected finance-user activity (Outlook, SharePoint DNS).',
     mitre: [
       { id: 'T1018',  name: 'Remote System Discovery' },
       { id: 'T1135',  name: 'Network Share Discovery' },
@@ -523,7 +523,7 @@ const SCENARIOS = [
     title: 'WinRM Lateral Movement',
     difficulty: 'HARD',
     viewType: 'flows',
-    brief: 'Workstation <strong>10.10.20.55</strong> (same finance host from prior alerts) is now talking to other internal hosts on unexpected ports. The team suspects lateral movement. Most of these flows are normal IT operations — identify the malicious lateral movement among the noise.',
+    brief: 'Workstation <strong>10.10.20.55</strong> (same finance host from prior alerts) is now talking to other internal hosts on unexpected ports. The team suspects lateral movement. Most of these flows are normal IT operations - identify the malicious lateral movement among the noise.',
     columns: ['#', 'TIME', 'SRC', 'DST', 'PORT', 'PROTO', 'PACKETS', 'BYTES', 'DUR'],
     rows: [
       { time: '14:11:02', src: '10.10.20.55', dst: '10.10.10.20', port: 445,  proto: 'TCP', pkts: 64,  bytes: '12 KB', dur: '2.1s' },
@@ -538,8 +538,8 @@ const SCENARIOS = [
       { time: '14:14:21', src: '10.10.20.55', dst: '10.10.10.24', port: 5985, proto: 'TCP', pkts: 422, bytes: '264 KB', dur: '11.8s' },
     ],
     malicious: [1, 3, 5, 7, 9],
-    hint: 'WinRM (port <strong>5985</strong>) is legitimate IT tooling — but watch <strong>direction and pattern</strong>. An IT admin host pushing to many endpoints is normal. A finance workstation initiating WinRM to many servers is not.',
-    explanation: 'Five outbound WinRM (5985/tcp) connections from <code>10.10.20.55</code> to sequential internal hosts (<code>10.10.10.20-24</code>) over ~3 minutes — each carrying ~200 KB of data — represent lateral movement via PowerShell Remoting. The finance workstation is initiating these sessions outbound to multiple targets, which is the inverse of legitimate WinRM usage where a few admin hosts push commands to many endpoints. Row 4 (<code>10.10.50.7 → 10.10.20.55:5985</code>) is the pattern of legitimate IT remote management — admin host inbound to a managed endpoint — and is correctly excluded. Rows 0, 2, 6, 8 are normal SMB and HTTPS traffic. The defining tell is direction + repetition: a finance host has no business invoking PSRemoting on five servers in a row.',
+    hint: 'WinRM (port <strong>5985</strong>) is legitimate IT tooling - but watch <strong>direction and pattern</strong>. An IT admin host pushing to many endpoints is normal. A finance workstation initiating WinRM to many servers is not.',
+    explanation: 'Five outbound WinRM (5985/tcp) connections from <code>10.10.20.55</code> to sequential internal hosts (<code>10.10.10.20-24</code>) over ~3 minutes - each carrying ~200 KB of data - represent lateral movement via PowerShell Remoting. The finance workstation is initiating these sessions outbound to multiple targets, which is the inverse of legitimate WinRM usage where a few admin hosts push commands to many endpoints. Row 4 (<code>10.10.50.7 → 10.10.20.55:5985</code>) is the pattern of legitimate IT remote management - admin host inbound to a managed endpoint - and is correctly excluded. Rows 0, 2, 6, 8 are normal SMB and HTTPS traffic. The defining tell is direction + repetition: a finance host has no business invoking PSRemoting on five servers in a row.',
     mitre: [
       { id: 'T1021.006', name: 'Remote Services: Windows Remote Management' },
       { id: 'T1570',     name: 'Lateral Tool Transfer' },
@@ -557,7 +557,7 @@ const SCENARIOS = [
     title: 'Kerberoasting Activity',
     difficulty: 'HARD',
     viewType: 'logs',
-    brief: 'Domain controller Kerberos logs from <strong>DC1.corp.local</strong>. Most of this is normal authentication traffic. Identify the requests consistent with Kerberoasting — credential access via service ticket extraction.',
+    brief: 'Domain controller Kerberos logs from <strong>DC1.corp.local</strong>. Most of this is normal authentication traffic. Identify the requests consistent with Kerberoasting - credential access via service ticket extraction.',
     rows: [
       { time: '08:14:02', src: 'kerberos.log', msg: 'TGS-REQ user=alice → cifs/fileserver01 enctype=AES256-CTS-HMAC-SHA1-96' },
       { time: '08:14:18', src: 'kerberos.log', msg: 'TGS-REQ user=bob → http/intranet enctype=AES256-CTS-HMAC-SHA1-96' },
@@ -574,8 +574,8 @@ const SCENARIOS = [
       { time: '08:16:18', src: 'kerberos.log', msg: 'TGS-REQ user=svc-monitoring → http/monitor enctype=AES256-CTS-HMAC-SHA1-96' },
     ],
     malicious: [3, 4, 5, 6, 7, 8, 10],
-    hint: 'Two patterns to spot. First: the <strong>encryption type</strong> matters — modern domains use AES, but Kerberoasting tools force a weaker algorithm to make ticket cracking faster. Second: a <strong>single user requesting many service tickets</strong> in a short window for accounts they don\'t normally use.',
-    explanation: 'User <code>dwilliams</code> requested 7 service tickets across ~16 seconds for accounts spanning SQL servers, Jira, Confluence, Exchange, and backup services — all using <code>RC4-HMAC</code> encryption. RC4 is the smoking gun: modern AD environments default to AES256, but Kerberoasting tools (Rubeus, Impacket\'s GetUserSPNs.py) explicitly request RC4 because RC4-encrypted service tickets are dramatically faster to crack offline with hashcat. A normal user accumulates service tickets organically across a workday as they access different services — they do not request 7 tickets to unrelated services in 16 seconds. The other rows show legitimate authentication patterns: normal users hitting their usual services, and legitimate service accounts (svc-backup, svc-monitoring) requesting tickets for the resources they\'re configured to manage.',
+    hint: 'Two patterns to spot. First: the <strong>encryption type</strong> matters - modern domains use AES, but Kerberoasting tools force a weaker algorithm to make ticket cracking faster. Second: a <strong>single user requesting many service tickets</strong> in a short window for accounts they don\'t normally use.',
+    explanation: 'User <code>dwilliams</code> requested 7 service tickets across ~16 seconds for accounts spanning SQL servers, Jira, Confluence, Exchange, and backup services - all using <code>RC4-HMAC</code> encryption. RC4 is the smoking gun: modern AD environments default to AES256, but Kerberoasting tools (Rubeus, Impacket\'s GetUserSPNs.py) explicitly request RC4 because RC4-encrypted service tickets are dramatically faster to crack offline with hashcat. A normal user accumulates service tickets organically across a workday as they access different services - they do not request 7 tickets to unrelated services in 16 seconds. The other rows show legitimate authentication patterns: normal users hitting their usual services, and legitimate service accounts (svc-backup, svc-monitoring) requesting tickets for the resources they\'re configured to manage.',
     mitre: [
       { id: 'T1558.003', name: 'Steal or Forge Kerberos Tickets: Kerberoasting' },
       { id: 'T1078.002', name: 'Valid Accounts: Domain Accounts' },
@@ -609,7 +609,7 @@ const SCENARIOS = [
     ],
     malicious: [3, 4, 5, 6, 7],
     hint: 'Compare bytes and packets across sessions. Normal wiki browsing pulls KBs per page. <strong>Sustained MB-scale transfers</strong> at regular intervals look more like an automated scraper or API export.',
-    explanation: 'Five sessions (rows 3-7) show a consistent pattern: ~8 MB transferred per connection, ~1800 packets, ~14 seconds duration, occurring roughly 15 seconds apart. This signature is consistent with an attacker using the Confluence REST API or a scraping tool to bulk-export pages — possibly via <code>/rest/api/content?expand=body.storage&limit=100</code>. Normal interactive wiki browsing (rows 0-2, 8-9) shows ~15-20 KB per page view with multi-second gaps between requests as the user reads. The 5x volume jump and rapid cadence strongly indicate automated collection. Whether this is a malicious insider, compromised credentials, or sanctioned bulk export is a separate investigation — but the pattern alone warrants escalation.',
+    explanation: 'Five sessions (rows 3-7) show a consistent pattern: ~8 MB transferred per connection, ~1800 packets, ~14 seconds duration, occurring roughly 15 seconds apart. This signature is consistent with an attacker using the Confluence REST API or a scraping tool to bulk-export pages - possibly via <code>/rest/api/content?expand=body.storage&limit=100</code>. Normal interactive wiki browsing (rows 0-2, 8-9) shows ~15-20 KB per page view with multi-second gaps between requests as the user reads. The 5x volume jump and rapid cadence strongly indicate automated collection. Whether this is a malicious insider, compromised credentials, or sanctioned bulk export is a separate investigation - but the pattern alone warrants escalation.',
     mitre: [
       { id: 'T1213.001', name: 'Data from Information Repositories: Confluence' },
       { id: 'T1119',     name: 'Automated Collection' },
@@ -627,7 +627,7 @@ const SCENARIOS = [
     title: 'Exfiltration to Cloud Storage',
     difficulty: 'HARD',
     viewType: 'flows',
-    brief: 'Workstation <strong>10.10.30.42</strong> network activity over the past hour. Cloud storage usage is permitted at this organization, so legitimate uploads will be present. Identify the flows consistent with data exfiltration — pay attention to <strong>volume direction</strong> (upload vs download), <strong>destination service</strong>, and <strong>timing</strong>.',
+    brief: 'Workstation <strong>10.10.30.42</strong> network activity over the past hour. Cloud storage usage is permitted at this organization, so legitimate uploads will be present. Identify the flows consistent with data exfiltration - pay attention to <strong>volume direction</strong> (upload vs download), <strong>destination service</strong>, and <strong>timing</strong>.',
     columns: ['#', 'TIME', 'SRC', 'DST', 'PORT', 'PROTO', 'PACKETS', 'BYTES', 'DUR'],
     rows: [
       { time: '17:42:11', src: '10.10.30.42', dst: 'onedrive.live.com',     port: 443, proto: 'TCP', pkts: 88,    bytes: '180 KB ↓', dur: '2.1s' },
@@ -644,7 +644,7 @@ const SCENARIOS = [
     ],
     malicious: [3, 5, 7, 9],
     hint: 'Three signals to weigh together. <strong>Service reputation</strong>: corporate-sanctioned (OneDrive, Teams, GitHub) vs exfil-friendly (Mega, Bunkr, Pastebin, anonymous Discord uploads). <strong>Volume direction</strong>: large outbound (↑) is more suspicious than inbound. <strong>Sheer scale</strong>: 100+ MB uploads outside normal sanctioned services warrant alerting.',
-    explanation: 'Four uploads to non-sanctioned services account for the exfiltration pattern. Row 3: 142 MB to <code>mega.nz</code> — Mega is heavily abused for data theft because of its end-to-end encryption and anonymous accounts. Row 5: 420 KB to <code>pastebin.com</code> — small but pastebin is a known channel for stolen credentials and small documents. Row 7: 88 MB to <code>discord-cdn-uploads.net</code> — note the fake-looking domain mimicking Discord\'s real CDN; legitimate Discord uploads go to <code>cdn.discordapp.com</code>. Row 9: 112 MB to <code>bunkr.la</code> — anonymous file host with a strong exfil reputation. The OneDrive upload (row 2, 4.2 MB) and Teams/GitHub traffic are corporate-sanctioned and within normal usage patterns. Note the broader story: this user previously triggered the bulk Confluence collection in SCN-008. The collection-then-exfil pipeline across two scenarios is the hunter\'s payoff.',
+    explanation: 'Four uploads to non-sanctioned services account for the exfiltration pattern. Row 3: 142 MB to <code>mega.nz</code> - Mega is heavily abused for data theft because of its end-to-end encryption and anonymous accounts. Row 5: 420 KB to <code>pastebin.com</code> - small but pastebin is a known channel for stolen credentials and small documents. Row 7: 88 MB to <code>discord-cdn-uploads.net</code> - note the fake-looking domain mimicking Discord\'s real CDN; legitimate Discord uploads go to <code>cdn.discordapp.com</code>. Row 9: 112 MB to <code>bunkr.la</code> - anonymous file host with a strong exfil reputation. The OneDrive upload (row 2, 4.2 MB) and Teams/GitHub traffic are corporate-sanctioned and within normal usage patterns. Note the broader story: this user previously triggered the bulk Confluence collection in SCN-008. The collection-then-exfil pipeline across two scenarios is the hunter\'s payoff.',
     mitre: [
       { id: 'T1567.002', name: 'Exfiltration to Cloud Storage' },
       { id: 'T1048.003', name: 'Exfiltration Over Unencrypted Non-C2 Protocol' },
@@ -662,7 +662,7 @@ const SCENARIOS = [
     title: 'Broadcast Name Poisoning',
     difficulty: 'HARD',
     viewType: 'logs',
-    brief: 'Zeek logs from the user VLAN <strong>10.10.20.0/24</strong>. Workstations periodically issue LLMNR (UDP/5355) and NBT-NS (UDP/137) broadcast queries when DNS lookups fail — typically from typos or stale shortcuts. Identify activity consistent with a <strong>poisoner</strong> on the network responding to those broadcasts to harvest hashes.',
+    brief: 'Zeek logs from the user VLAN <strong>10.10.20.0/24</strong>. Workstations periodically issue LLMNR (UDP/5355) and NBT-NS (UDP/137) broadcast queries when DNS lookups fail - typically from typos or stale shortcuts. Identify activity consistent with a <strong>poisoner</strong> on the network responding to those broadcasts to harvest hashes.',
     rows: [
       { time: '10:14:02', src: 'dns.log',     msg: '10.10.20.31 → 10.10.20.1 query A fileserver01.corp.local → 10.10.10.20' },
       { time: '10:14:18', src: 'llmnr.log',   msg: '10.10.20.42 → 224.0.0.252 query "fileserer" (typo - no DNS match)' },
@@ -681,8 +681,8 @@ const SCENARIOS = [
       { time: '10:30:02', src: 'nbns.log',    msg: '10.10.20.71 → 10.10.20.255 query "ISATAP" (IPv6 transition - normal)' },
     ],
     malicious: [2, 3, 5, 6, 7, 10, 11],
-    hint: 'LLMNR/NBT-NS broadcasts themselves are noisy and mostly benign. The crime is in the <strong>responses</strong>. Watch for one IP repeatedly answering everyone\'s broadcast queries — and what happens <strong>immediately after</strong> each answer.',
-    explanation: 'Workstation <code>10.10.20.99</code> is running a poisoner (Responder, Inveigh, or similar). Three times across the window, it answers LLMNR/NBT-NS broadcasts that it has no business answering — claiming to be <code>fileserer</code> (a typo of fileserver), <code>WPAD</code> (proxy auto-config), and <code>printserv</code>. Each response is followed by the victim authenticating to <code>.99</code> with their NTLMv2 hash, which the poisoner captures for offline cracking. The WPAD case (rows 5-7) is particularly nasty: it hijacks the victim\'s web traffic via fake proxy config, then forces NTLM auth to the malicious "proxy." The benign rows: LLMNR queries with no matching response (rows 13, 14) are normal network noise. ISATAP and successful DNS lookups (rows 0, 8, 9, 12) are unrelated traffic. The pattern <code>broadcast query → unsolicited answer from .99 → NTLM auth to .99</code> repeating across multiple users is the unmistakable signature.',
+    hint: 'LLMNR/NBT-NS broadcasts themselves are noisy and mostly benign. The crime is in the <strong>responses</strong>. Watch for one IP repeatedly answering everyone\'s broadcast queries - and what happens <strong>immediately after</strong> each answer.',
+    explanation: 'Workstation <code>10.10.20.99</code> is running a poisoner (Responder, Inveigh, or similar). Three times across the window, it answers LLMNR/NBT-NS broadcasts that it has no business answering - claiming to be <code>fileserer</code> (a typo of fileserver), <code>WPAD</code> (proxy auto-config), and <code>printserv</code>. Each response is followed by the victim authenticating to <code>.99</code> with their NTLMv2 hash, which the poisoner captures for offline cracking. The WPAD case (rows 5-7) is particularly nasty: it hijacks the victim\'s web traffic via fake proxy config, then forces NTLM auth to the malicious "proxy." The benign rows: LLMNR queries with no matching response (rows 13, 14) are normal network noise. ISATAP and successful DNS lookups (rows 0, 8, 9, 12) are unrelated traffic. The pattern <code>broadcast query → unsolicited answer from .99 → NTLM auth to .99</code> repeating across multiple users is the unmistakable signature.',
     mitre: [
       { id: 'T1557.001', name: 'Adversary-in-the-Middle: LLMNR/NBT-NS Poisoning and SMB Relay' },
       { id: 'T1187',     name: 'Forced Authentication' },
@@ -701,7 +701,7 @@ const SCENARIOS = [
     title: 'JA3 Fingerprint Anomaly',
     difficulty: 'HARD',
     viewType: 'flows',
-    brief: 'TLS sessions from the user network to <strong>cdn.cloudfront.net</strong> over 30 minutes. The destination is legitimate — millions of websites use CloudFront as their CDN. But TLS handshakes carry a <strong>JA3 client fingerprint</strong> that identifies the underlying client library. Identify sessions where the JA3 hash is inconsistent with normal browser traffic.',
+    brief: 'TLS sessions from the user network to <strong>cdn.cloudfront.net</strong> over 30 minutes. The destination is legitimate - millions of websites use CloudFront as their CDN. But TLS handshakes carry a <strong>JA3 client fingerprint</strong> that identifies the underlying client library. Identify sessions where the JA3 hash is inconsistent with normal browser traffic.',
     columns: ['#', 'TIME', 'SRC', 'SNI', 'JA3', 'BYTES', 'NOTES'],
     fields: ['time', 'src', 'sni', 'ja3', 'bytes', 'notes'],
     rows: [
@@ -721,8 +721,8 @@ const SCENARIOS = [
       { time: '11:30:11', src: '10.10.20.31', sni: 'svc-update.cloudfront.net', ja3: 'e7d705a328...6865',  bytes: '12 KB',  notes: 'unknown JA3' },
     ],
     malicious: [8, 10, 12, 13],
-    hint: 'Two known-good JA3s in this environment: Chrome 120 (<code>6734f3...</code>) and Firefox 121 (<code>a0e9f5...</code>). Anything else is a <strong>different TLS client library</strong>. Single oddities happen — but watch for <strong>repeated unknown fingerprints</strong> at regular intervals.',
-    explanation: 'Workstation <code>10.10.20.31</code> is making TLS connections with JA3 hash <code>e7d705a328...6865</code> — neither baseline browser fingerprint. The four connections occur at suspiciously regular ~3-minute intervals to the same SNI (<code>svc-update.cloudfront.net</code>) with identical 12 KB payloads — a beaconing pattern. The attacker is using domain fronting via CloudFront: the SNI resolves to legitimate AWS infrastructure, but the JA3 reveals the client is not a browser. Common pattern for malware C2 frameworks that hide behind reputable CDN destinations. The single curl session at 11:11 (row 5) is excluded — its JA3 differs from the malware fingerprint and one-off curl is common in dev environments. The lesson: <strong>destination reputation alone is not enough</strong>. CloudFront, Azure Front Door, and similar CDNs are abused precisely because their domains can\'t be blocklisted. JA3/JA4 fingerprinting catches the client even when the destination is sanctioned.',
+    hint: 'Two known-good JA3s in this environment: Chrome 120 (<code>6734f3...</code>) and Firefox 121 (<code>a0e9f5...</code>). Anything else is a <strong>different TLS client library</strong>. Single oddities happen - but watch for <strong>repeated unknown fingerprints</strong> at regular intervals.',
+    explanation: 'Workstation <code>10.10.20.31</code> is making TLS connections with JA3 hash <code>e7d705a328...6865</code> - neither baseline browser fingerprint. The four connections occur at suspiciously regular ~3-minute intervals to the same SNI (<code>svc-update.cloudfront.net</code>) with identical 12 KB payloads - a beaconing pattern. The attacker is using domain fronting via CloudFront: the SNI resolves to legitimate AWS infrastructure, but the JA3 reveals the client is not a browser. Common pattern for malware C2 frameworks that hide behind reputable CDN destinations. The single curl session at 11:11 (row 5) is excluded - its JA3 differs from the malware fingerprint and one-off curl is common in dev environments. The lesson: <strong>destination reputation alone is not enough</strong>. CloudFront, Azure Front Door, and similar CDNs are abused precisely because their domains can\'t be blocklisted. JA3/JA4 fingerprinting catches the client even when the destination is sanctioned.',
     mitre: [
       { id: 'T1071.001', name: 'Application Layer Protocol: Web Protocols' },
       { id: 'T1090.004', name: 'Proxy: Domain Fronting' },
@@ -741,7 +741,7 @@ const SCENARIOS = [
     title: 'The Quiet One',
     difficulty: 'HARD',
     viewType: 'flows',
-    brief: 'Outbound flows from finance workstation <strong>10.10.30.42</strong> over a single hour. Everything here looks like <em>completely normal</em> business traffic — Outlook, Teams, OneDrive, GitHub, weather, Spotify. Hidden among it is exactly <strong>one</strong> session that does not belong. Find it. <em>(False positives are heavily penalized in this scenario.)</em>',
+    brief: 'Outbound flows from finance workstation <strong>10.10.30.42</strong> over a single hour. Everything here looks like <em>completely normal</em> business traffic - Outlook, Teams, OneDrive, GitHub, weather, Spotify. Hidden among it is exactly <strong>one</strong> session that does not belong. Find it. <em>(False positives are heavily penalized in this scenario.)</em>',
     columns: ['#', 'TIME', 'SRC', 'DESTINATION', 'PORT', 'BYTES', 'DUR'],
     fields: ['time', 'src', 'dst', 'port', 'bytes', 'dur'],
     rows: [
@@ -764,7 +764,7 @@ const SCENARIOS = [
     ],
     malicious: [10],
     hint: 'Read the <strong>destination field</strong> very carefully on every row. Three letters of difference is the whole game.',
-    explanation: 'Row 11 connects to <code>outloook.office365.com</code> — note the <strong>three</strong> O\'s. Real Microsoft is <code>outlook.office365.com</code> with two. This is a homograph / typosquatted domain — almost certainly attacker-controlled infrastructure designed to harvest credentials, deliver payloads, or serve as a low-volume C2 channel that survives a casual analyst eyeballing the logs. Everything else is genuine: real Outlook appears five other times in this window with the correct spelling. Spotify and weather are lunch-break browsing. GitHub fits a developer-adjacent role. This scenario exists to make a single point: <strong>the most dangerous anomalies don\'t announce themselves</strong>. Adversaries who do their homework hide in your normal traffic and bet on tired analysts. Visual scanning is not enough — automated detections that compare SNIs and domains against known-good allowlists catch this every time. Trust the tooling, not the eyeballs.',
+    explanation: 'Row 11 connects to <code>outloook.office365.com</code> - note the <strong>three</strong> O\'s. Real Microsoft is <code>outlook.office365.com</code> with two. This is a homograph / typosquatted domain - almost certainly attacker-controlled infrastructure designed to harvest credentials, deliver payloads, or serve as a low-volume C2 channel that survives a casual analyst eyeballing the logs. Everything else is genuine: real Outlook appears five other times in this window with the correct spelling. Spotify and weather are lunch-break browsing. GitHub fits a developer-adjacent role. This scenario exists to make a single point: <strong>the most dangerous anomalies don\'t announce themselves</strong>. Adversaries who do their homework hide in your normal traffic and bet on tired analysts. Visual scanning is not enough - automated detections that compare SNIs and domains against known-good allowlists catch this every time. Trust the tooling, not the eyeballs.',
     mitre: [
       { id: 'T1583.001', name: 'Acquire Infrastructure: Domains (typosquatting)' },
       { id: 'T1071.001', name: 'Application Layer Protocol: Web Protocols' },
@@ -876,7 +876,7 @@ function renderSidebar() {
       state.revealed = !!state.results[idx];
       state.hintShown = false;
       state.activeTab = 'analysis';
-      // If revisiting a done scenario, repopulate selected with what they picked? Skip for v1 — just show explanation fresh.
+      // If revisiting a done scenario, repopulate selected with what they picked? Skip for v1 - just show explanation fresh.
       if (state.revealed) state.selected = new Set(SCENARIOS[idx].malicious);
       render();
     });
@@ -885,7 +885,7 @@ function renderSidebar() {
   // Run stats
   const done = Object.keys(state.results).length;
   $('#side-score').textContent = state.totalScore;
-  $('#side-avg').textContent = done ? Math.round(state.totalScore / done) : '—';
+  $('#side-avg').textContent = done ? Math.round(state.totalScore / done) : '-';
   $('#side-tp').textContent = state.totalHits;
   $('#side-miss').textContent = state.totalMisses;
   $('#side-fp').textContent = state.totalFps;
@@ -908,7 +908,7 @@ function renderInstructions() {
     <div class="callout">
       <span class="callout-label">▸ Instructions</span>
       Click rows you believe are malicious. Press <strong>Submit</strong> to evaluate.
-      Use <strong>Hint</strong> if you're stuck — disabled in challenge mode.
+      Use <strong>Hint</strong> if you're stuck - disabled in challenge mode.
     </div>
   `;
 }
@@ -1050,7 +1050,7 @@ function renderReveal(sc) {
       </div>
 
       <div class="tab-panel ${state.activeTab === 'detect' ? 'active' : ''}" data-panel="detect">
-        <p style="color:var(--text3);font-size:11px;margin-bottom:12px;">Paste-ready detection logic. Variables like <code>$HOME_NET</code> are placeholders — replace with values from your environment.</p>
+        <p style="color:var(--text3);font-size:11px;margin-bottom:12px;">Paste-ready detection logic. Variables like <code>$HOME_NET</code> are placeholders - replace with values from your environment.</p>
         ${sc.detection.map((d, i) => `
           <div class="detect-block">
             <div class="detect-hdr">
@@ -1075,10 +1075,10 @@ function renderComplete() {
   const max = SCENARIOS.length * 100;
   const pct = Math.round((state.totalScore / max) * 100);
   const tone = pct >= 80 ? '' : pct >= 60 ? 'partial' : 'fail';
-  const verdict = pct >= 80 ? 'EXCELLENT — ANALYST GRADE'
-                : pct >= 60 ? 'PROFICIENT — KEEP HUNTING'
-                : pct >= 40 ? 'DEVELOPING — REVIEW MISSES'
-                            : 'NEEDS PRACTICE — RERUN TUTORIAL';
+  const verdict = pct >= 80 ? 'EXCELLENT - ANALYST GRADE'
+                : pct >= 60 ? 'PROFICIENT - KEEP HUNTING'
+                : pct >= 40 ? 'DEVELOPING - REVIEW MISSES'
+                            : 'NEEDS PRACTICE - RERUN TUTORIAL';
 
   return `
     <div class="complete">
