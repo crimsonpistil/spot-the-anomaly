@@ -290,7 +290,7 @@ table.flows .col-proto{color:var(--purple)}
     <a class="switcher-side" href="https://hunt.6b74.dev">HUNT</a>
     <span class="switcher-side active">DETECT</span>
   </div>
-  <div class="crumb">// net detective</div>
+  <div class="crumb">// network traffic detective</div>
   <div class="header-right">
     <span class="live-dot">SESSION LIVE</span>
     <span class="stat keep">SCENARIO <strong id="stat-scenario">1/2</strong></span>
@@ -311,7 +311,7 @@ table.flows .col-proto{color:var(--purple)}
 <div class="method-banner" id="method-banner">
   <div class="method-banner-inner">
     <span class="method-banner-label">▸ Methodology Note</span>
-    <p>Real hunts rarely map to a single MITRE technique. A scenario titled "exfiltration" might involve text storage (T1567.003), cloud storage (T1567.002), and non-C2 protocol exfil (T1048.003) all at once. When you reference the matrix, look at <strong>adjacent techniques</strong> within the same tactic, not just the most obvious one. Tunnel vision on one ID is the most common rookie mistake. <span class="method-banner-meta">Hints shown in tutorial mode only. Switch to Challenge to hide.</span></p>
+    <p>Real hunts rarely map to a single MITRE technique. A scenario titled "exfiltration" might involve text storage (T1567.003), cloud storage (T1567.002), and non-C2 protocol exfil (T1048.003) all at once. When you reference the matrix, look at <strong>adjacent techniques</strong> within the same tactic, not just the most obvious one. Tunnel vision on one ID is the most common rookie mistake. <span class="method-banner-meta">Hints shown in tutorial mode only. Switch to "Challenge" to hide.</span></p>
   </div>
 </div>
 
@@ -347,7 +347,7 @@ table.flows .col-proto{color:var(--purple)}
    - PsExec admin share + service creation (SMB + service log mix)
    - Golden Ticket (kerberos with absurd lifetime)
    - LSASS dump exfil over SMB (zeek files.log pattern)
-   - Cobalt Strike default profile (HTTP user-agent + URI tells)
+   ✓ Cobalt Strike default profile                → SCN-013
    - ICMP tunneling (raw protocol abuse)
    - Scheduled Task remote creation via SMB
    ============================================================ */
@@ -826,6 +826,50 @@ const SCENARIOS = [
       { tool: 'arkime',   label: 'Arkime',       code: 'tls.ja3.host == "outloook.office365.com"' },
       { tool: 'kibana',   label: 'Kibana (KQL)', code: 'tls.server_name:*office365.com AND NOT tls.server_name:(outlook.office365.com OR login.microsoftonline.com OR teams.microsoft.com OR *.outlook.com)' },
       { tool: 'suricata', label: 'Suricata',     code: 'alert tls $HOME_NET any -> $EXTERNAL_NET any (msg:"Possible typosquat - office365 lookalike"; tls.sni; content:"office365.com"; pcre:"/^(?!outlook\\\\.|login\\\\.|.*\\\\.outlook\\\\.).*office365\\\\.com$/"; sid:1000012;)' },
+    ],
+  },
+
+  /* ====== SCN-013 · C2 · Cobalt Strike Default Profile ====== */
+  {
+    id: 'SCN-013',
+    title: 'Cobalt Strike Default Profile',
+    difficulty: 'MEDIUM',
+    viewType: 'logs',
+    brief: 'HTTP access logs from the perimeter proxy covering workstation <strong>10.10.20.88</strong>. The host has been flagged by EDR for an unexplained process injection event. Review the web traffic to determine whether C2 activity is present - and if so, identify which sessions belong to the implant rather than the user.',
+    rows: [
+      { time: '09:02:14', src: 'proxy.log', msg: 'GET https://news.bbc.co.uk/ 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"' },
+      { time: '09:03:42', src: 'proxy.log', msg: 'GET https://mail.google.com/mail/u/0/ 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"' },
+      { time: '09:04:18', src: 'proxy.log', msg: 'GET http://203.0.113.88/activity 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
+      { time: '09:04:52', src: 'proxy.log', msg: 'GET https://cdn.jquery.com/jquery-3.7.1.min.js 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"' },
+      { time: '09:05:04', src: 'proxy.log', msg: 'POST http://203.0.113.88/submit.php 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
+      { time: '09:12:11', src: 'proxy.log', msg: 'GET https://outlook.office365.com/owa/ 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"' },
+      { time: '09:14:18', src: 'proxy.log', msg: 'GET http://203.0.113.88/px.gif 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
+      { time: '09:14:52', src: 'proxy.log', msg: 'GET https://docs.microsoft.com/en-us/ 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"' },
+      { time: '09:24:19', src: 'proxy.log', msg: 'GET http://203.0.113.88/activity 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
+      { time: '09:24:53', src: 'proxy.log', msg: 'POST http://203.0.113.88/submit.php 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
+      { time: '09:31:14', src: 'proxy.log', msg: 'GET https://github.com/ 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"' },
+      { time: '09:34:19', src: 'proxy.log', msg: 'GET http://203.0.113.88/px.gif 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
+      { time: '09:34:52', src: 'proxy.log', msg: 'POST http://203.0.113.88/submit.php 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
+      { time: '09:41:55', src: 'proxy.log', msg: 'GET https://www.reddit.com/ 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"' },
+      { time: '09:44:19', src: 'proxy.log', msg: 'GET http://203.0.113.88/activity 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
+      { time: '09:44:52', src: 'proxy.log', msg: 'POST http://203.0.113.88/submit.php 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
+    ],
+    malicious: [2, 4, 6, 8, 9, 11, 12, 14, 15],
+    hint: 'Two things to focus on. First: <strong>user-agent strings</strong>. IE9 on Windows 7 (<code>MSIE 9.0; Windows NT 6.1</code>) hasn\'t been a real browser in over a decade. Second: <strong>URI patterns</strong>. Cross-reference the flagged destination IP against the URIs being requested - some of them have a very specific reputation.',
+    explanation: 'Nine requests to <code>203.0.113.88</code> are issued by a process impersonating IE9 on Windows 7 - a user-agent that hasn\'t reflected a real browser since 2016. The URIs tell the rest of the story: <code>/activity</code> and <code>/px.gif</code> are check-in requests (the beacon polling for tasking), while <code>/submit.php</code> is the data upload path. These three URIs are part of the Cobalt Strike default HTTP Malleable C2 profile, and are so well-known among defenders that any operator still running the default profile is either new or careless. The beacon cycle is visible too: GET /activity, POST /submit.php pairs repeating at roughly 10-minute intervals (09:04, 09:14 partial, 09:24, 09:34, 09:44) with some jitter. The legitimate user traffic interspersed throughout uses a current Chrome UA and hits recognizable destinations - BBC, Gmail, Outlook, GitHub. Two separate processes are making HTTP requests from this host: the user\'s browser, and the implant.',
+    mitre: [
+      { id: 'T1071.001', name: 'Application Layer Protocol: Web Protocols' },
+      { id: 'T1001.001', name: 'Data Obfuscation: Junk Data' },
+      { id: 'T1036.005', name: 'Masquerading: Match Legitimate Name or Location' },
+    ],
+    relatedTechniques: [
+      { id: 'T1055', name: 'Process Injection', note: 'EDR flagged injection before this traffic appeared' },
+      { id: 'T1027.005', name: 'Obfuscated Files or Information: Indicator Removal from Tools', note: 'operators customizing the profile to avoid this detection' },
+    ],
+    detection: [
+      { tool: 'arkime',   label: 'Arkime',       code: 'http.user-agent == "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)" && (http.uri == "/activity" || http.uri == "/submit.php" || http.uri == "/px.gif")' },
+      { tool: 'kibana',   label: 'Kibana (KQL)', code: 'user_agent.original:"Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)" AND url.path:(/activity OR /submit.php OR /px.gif)' },
+      { tool: 'suricata', label: 'Suricata',     code: 'alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"Cobalt Strike default profile UA - MSIE 9.0 Win7"; http.user_agent; content:"MSIE 9.0"; content:"Windows NT 6.1"; within:60; sid:1000013;)' },
     ],
   }
 ];
