@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Interactive network traffic detective. Spot anomalies in flow tables, log streams, and dashboards. MITRE ATT&CK-mapped scenarios for threat hunting practice.">
+<meta name="description" content="Interactive network traffic detective. Spot anomalies in flow tables, log streams, and dashboards. MITRE ATT&CK-mapped scenarios for hunt practice.">
 <title>[6B74] Spot the Anomaly</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -290,7 +290,7 @@ table.flows .col-proto{color:var(--purple)}
     <a class="switcher-side" href="https://hunt.6b74.dev">HUNT</a>
     <span class="switcher-side active">DETECT</span>
   </div>
-  <div class="crumb">// network traffic detective</div>
+  <div class="crumb">// net detective</div>
   <div class="header-right">
     <span class="live-dot">SESSION LIVE</span>
     <span class="stat keep">SCENARIO <strong id="stat-scenario">1/2</strong></span>
@@ -311,7 +311,7 @@ table.flows .col-proto{color:var(--purple)}
 <div class="method-banner" id="method-banner">
   <div class="method-banner-inner">
     <span class="method-banner-label">▸ Methodology Note</span>
-    <p>Real hunts rarely map to a single MITRE technique. A scenario titled "exfiltration" might involve text storage (T1567.003), cloud storage (T1567.002), and non-C2 protocol exfil (T1048.003) all at once. When you reference the matrix, look at <strong>adjacent techniques</strong> within the same tactic, not just the most obvious one. Tunnel vision on one ID is the most common rookie mistake. <span class="method-banner-meta">Tutorial mode only. Switch to Challenge to hide.</span></p>
+    <p>Real hunts rarely map to a single MITRE technique. A scenario titled "exfiltration" might involve text storage (T1567.003), cloud storage (T1567.002), and non-C2 protocol exfil (T1048.003) all at once. When you reference the matrix, look at <strong>adjacent techniques</strong> within the same tactic, not just the most obvious one. Tunnel vision on one ID is the most common rookie mistake. <span class="method-banner-meta">Hints shown in tutorial mode only. Switch to Challenge to hide.</span></p>
   </div>
 </div>
 
@@ -340,7 +340,7 @@ table.flows .col-proto{color:var(--purple)}
 /* ============================================================
    TODO · SCENARIO IDEAS (build when inspired)
    ============================================================
-   On deck:
+   Still on deck:
    - Pass-the-Hash / NTLM relay (Kerberos absence + SMB pattern)
    - DCSync replication request (kerberos + DRSUAPI)
    - Domain Generation Algorithm beacons (DNS view with DGA strings)
@@ -376,7 +376,7 @@ const SCENARIOS = [
     ],
     malicious: [1, 3, 5, 7, 9, 11],
     hint: 'Look at <strong>timing</strong> and <strong>size</strong>. Legitimate user traffic is bursty and irregular. Beacons are mechanical - same destination, same payload size, same interval.',
-    explanation: 'Six flows to <code>185.220.101.42</code> occur at exactly 2-minute intervals (14:02:47, 14:04:47, 14:06:47…), each transferring an identical 1.4 KB payload in 8 packets. This is textbook C2 beaconing: a regular, low-volume callback to check for operator instructions. The other flows show normal user-driven variability in size and timing. The destination IP also belongs to a known Tor exit node range - another red flag.',
+    explanation: 'Six flows to <code>185.220.101.42</code> occur at exactly 2-minute intervals (14:02:47, 14:04:47, 14:06:47…), each transferring an identical 1.4 KB payload in 8 packets. The regularity is the problem: legitimate user traffic is bursty and variable, shaped by human behavior. Mechanical precision at fixed intervals is a C2 beacon checking in for operator instructions. The other flows show normal user-driven variability in size and timing. The destination IP also belongs to a known Tor exit node range, which adds weight to the finding.',
     mitre: [
       { id: 'T1071.001', name: 'Application Layer Protocol: Web Protocols' },
       { id: 'T1573', name: 'Encrypted Channel' },
@@ -492,7 +492,7 @@ const SCENARIOS = [
     ],
     malicious: [3, 4, 6, 9, 12],
     hint: 'URL-decode mentally as you scan. Look for <strong>SQL syntax</strong> (<code>UNION</code>, <code>OR 1=1</code>), <strong>directory traversal</strong> (<code>../</code>), and unusual <strong>user-agents</strong> like <code>sqlmap</code> or raw <code>curl</code>. 403/500 status codes also flag suspicious activity.',
-    explanation: 'Five requests from <code>203.0.113.77</code> show clear exploitation attempts. Decoded payloads: row 04 is SQL injection (<code>id=42\' OR 1=1--</code>), row 05 is a UNION-based SQLi extracting credentials (<code>UNION SELECT null,username,password FROM users</code>), row 07 attempts a destructive <code>DROP TABLE</code>, row 10 is a path traversal trying to read <code>/etc/passwd</code>, and row 13 attempts to upload a PHP webshell. The user-agents <code>curl/7.81.0</code> and <code>sqlmap/1.7.2</code> are dead giveaways - sqlmap is an automated SQL injection tool, and no real user browses with raw curl. The other requests from <code>198.51.100.5</code> show normal user behavior with a browser UA.',
+    explanation: 'Five requests from <code>203.0.113.77</code> show clear exploitation attempts. Decoded payloads: row 04 is SQL injection (<code>id=42\' OR 1=1--</code>), row 05 is a UNION-based SQLi extracting credentials (<code>UNION SELECT null,username,password FROM users</code>), row 07 attempts a destructive <code>DROP TABLE</code>, row 10 is a path traversal trying to read <code>/etc/passwd</code>, and row 13 attempts to upload a PHP webshell. The user-agents tell the rest of the story: <code>sqlmap/1.7.2</code> is an automated SQL injection framework, not a browser, and <code>curl/7.81.0</code> indicates scripted requests rather than interactive browsing. The other requests from <code>198.51.100.5</code> show normal user behavior with a legitimate browser UA.',
     mitre: [
       { id: 'T1190', name: 'Exploit Public-Facing Application' },
       { id: 'T1505.003', name: 'Server Software Component: Web Shell' },
@@ -535,7 +535,7 @@ const SCENARIOS = [
     ],
     malicious: [3, 4, 5, 6, 7, 12, 13, 14],
     hint: 'A finance user normally hits <strong>email and SharePoint</strong>. Watch for <strong>scanning behavior</strong> (rapid same-port connections to many internal IPs), <strong>LDAP searches</strong> for sensitive groups, and lookups for <strong>admin workstations</strong> they shouldn\'t know exist.',
-    explanation: 'Five SMB connections to sequential internal IPs (10.10.10.1-5) at the same timestamp indicate share enumeration - a finance workstation has no reason to scan the server subnet. The TGS-REQ for <code>host/admin-ws01.corp.local</code> is suspicious because a finance user shouldn\'t be requesting tickets for admin workstations. The two LDAP searches are particularly damning: enumerating all user objects and specifically the Domain Admins group is textbook BloodHound or PowerView reconnaissance. The Kerberos requests for fileservers (rows 09-11) are noisy but could be legitimate share access - they\'re not in the malicious set because we want to focus on the clear behavioral anomalies. Rows 01, 02, 03, and 16 show expected finance-user activity (Outlook, SharePoint DNS).',
+    explanation: 'Five SMB connections to sequential internal IPs (10.10.10.1-5) at the same timestamp indicate share enumeration - a finance workstation has no reason to scan the server subnet. The TGS-REQ for <code>host/admin-ws01.corp.local</code> is suspicious because a finance user shouldn\'t be requesting tickets for admin workstations. The two LDAP searches are the most significant findings: enumerating all user objects and specifically the Domain Admins group membership is consistent with BloodHound or PowerView reconnaissance - tools that map AD to find the fastest path to privilege escalation. The Kerberos requests for fileservers (rows 09-11) are noisy but could be legitimate share access - they\'re not in the malicious set because we want to focus on the clear behavioral anomalies. Rows 01, 02, 03, and 16 show expected finance-user activity (Outlook, SharePoint DNS).',
     mitre: [
       { id: 'T1018',  name: 'Remote System Discovery' },
       { id: 'T1135',  name: 'Network Share Discovery' },
@@ -611,7 +611,7 @@ const SCENARIOS = [
     ],
     malicious: [3, 4, 5, 6, 7, 8, 10],
     hint: 'Two patterns to spot. First: the <strong>encryption type</strong> matters - modern domains use AES, but Kerberoasting tools force a weaker algorithm to make ticket cracking faster. Second: a <strong>single user requesting many service tickets</strong> in a short window for accounts they don\'t normally use.',
-    explanation: 'User <code>dwilliams</code> requested 7 service tickets across ~16 seconds for accounts spanning SQL servers, Jira, Confluence, Exchange, and backup services - all using <code>RC4-HMAC</code> encryption. RC4 is the smoking gun: modern AD environments default to AES256, but Kerberoasting tools (Rubeus, Impacket\'s GetUserSPNs.py) explicitly request RC4 because RC4-encrypted service tickets are dramatically faster to crack offline with hashcat. A normal user accumulates service tickets organically across a workday as they access different services - they do not request 7 tickets to unrelated services in 16 seconds. The other rows show legitimate authentication patterns: normal users hitting their usual services, and legitimate service accounts (svc-backup, svc-monitoring) requesting tickets for the resources they\'re configured to manage.',
+    explanation: 'User <code>dwilliams</code> requested 7 service tickets across ~16 seconds for accounts spanning SQL servers, Jira, Confluence, Exchange, and backup services - all using <code>RC4-HMAC</code> encryption. The RC4 usage is the critical indicator: modern AD environments default to AES256, but Kerberoasting tools (Rubeus, Impacket\'s GetUserSPNs.py) explicitly request RC4 because RC4-encrypted service tickets crack dramatically faster offline with hashcat. A normal user accumulates service tickets organically across a workday as they access different services - they do not request 7 tickets to unrelated services in 16 seconds. The other rows show legitimate authentication patterns: normal users hitting their usual services, and legitimate service accounts (svc-backup, svc-monitoring) requesting tickets for the resources they\'re configured to manage.',
     mitre: [
       { id: 'T1558.003', name: 'Steal or Forge Kerberos Tickets: Kerberoasting' },
       { id: 'T1078.002', name: 'Valid Accounts: Domain Accounts' },
@@ -726,7 +726,7 @@ const SCENARIOS = [
     ],
     malicious: [2, 3, 5, 6, 7, 10, 11],
     hint: 'LLMNR/NBT-NS broadcasts themselves are noisy and mostly benign. The crime is in the <strong>responses</strong>. Watch for one IP repeatedly answering everyone\'s broadcast queries - and what happens <strong>immediately after</strong> each answer.',
-    explanation: 'Workstation <code>10.10.20.99</code> is running a poisoner (Responder, Inveigh, or similar). Three times across the window, it answers LLMNR/NBT-NS broadcasts that it has no business answering - claiming to be <code>fileserer</code> (a typo of fileserver), <code>WPAD</code> (proxy auto-config), and <code>printserv</code>. Each response is followed by the victim authenticating to <code>.99</code> with their NTLMv2 hash, which the poisoner captures for offline cracking. The WPAD case (rows 06-08) is particularly nasty: it hijacks the victim\'s web traffic via fake proxy config, then forces NTLM auth to the malicious "proxy." The benign rows: LLMNR queries with no matching response (rows 14, 15) are normal network noise. ISATAP and successful DNS lookups (rows 01, 09, 10, 13) are unrelated traffic. The pattern <code>broadcast query → unsolicited answer from .99 → NTLM auth to .99</code> repeating across multiple users is the unmistakable signature.',
+    explanation: 'Workstation <code>10.10.20.99</code> is running a poisoner (Responder, Inveigh, or similar). Three times across the window, it answers LLMNR/NBT-NS broadcasts that it has no business answering - claiming to be <code>fileserer</code> (a typo of fileserver), <code>WPAD</code> (proxy auto-config), and <code>printserv</code>. Each response is followed by the victim authenticating to <code>.99</code> with their NTLMv2 hash, which the poisoner captures for offline cracking. The WPAD case (rows 06-08) is worth noting specifically: it hijacks the victim\'s web traffic via fake proxy config, then forces NTLM auth to the malicious "proxy," which means credential capture and traffic interception in a single move. The benign rows: LLMNR queries with no matching response (rows 14, 15) are normal network noise. ISATAP and successful DNS lookups (rows 01, 09, 10, 13) are unrelated traffic. The repeating pattern - <code>broadcast query, unsolicited answer from .99, NTLM auth to .99</code> - across three different victims is what escalates this from suspicion to confirmed compromise.',
     mitre: [
       { id: 'T1557.001', name: 'Adversary-in-the-Middle: LLMNR/NBT-NS Poisoning and SMB Relay' },
       { id: 'T1187',     name: 'Forced Authentication' },
