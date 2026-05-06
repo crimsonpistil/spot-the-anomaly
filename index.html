@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Interactive network traffic detective. Spot anomalies in flow tables, log streams, and dashboards. MITRE ATT&CK-mapped scenarios for SOC analysts and threat hunters.">
-<title>[6B74] Spot the Anomaly // Net Detective</title>
+<meta name="description" content="Interactive network traffic detective. Spot anomalies in flow tables, log streams, and dashboards. MITRE ATT&CK-mapped scenarios for threat hunting practice.">
+<title>[6B74] Spot the Anomaly</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
@@ -80,6 +80,18 @@ header{background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 
 
 /* MODE BAR */
 .mode-bar{background:var(--bg3);border-bottom:1px solid var(--border);padding:6px 20px;display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+
+/* METHODOLOGY BANNER - page-level advisory, tutorial-mode only */
+.method-banner{background:linear-gradient(to right,rgba(188,140,255,.08),rgba(188,140,255,.03));border-bottom:1px solid var(--border);overflow:hidden;max-height:200px;transition:max-height .25s ease,opacity .2s ease,border-bottom-color .2s ease}
+.method-banner.hidden{max-height:0;opacity:0;border-bottom-color:transparent}
+.method-banner-inner{max-width:1400px;margin:0 auto;padding:14px 20px;border-left:3px solid var(--purple);margin-left:max(0px,calc((100% - 1400px)/2));position:relative}
+.method-banner-label{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--purple);text-transform:uppercase;letter-spacing:.1em;display:block;margin-bottom:6px}
+.method-banner p{font-size:13px;color:var(--text2);line-height:1.65;max-width:1100px}
+.method-banner-meta{font-family:var(--mono);font-size:11px;color:var(--text3);font-style:italic;margin-left:6px}
+@media(max-width:900px){
+  .method-banner-inner{margin-left:0;padding:12px 20px}
+  .method-banner p{font-size:12px}
+}
 .mode-bar .filter-label{font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em;margin-right:4px}
 .mode-btn{background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text2);font-family:var(--mono);font-size:10px;font-weight:500;padding:3px 10px;cursor:pointer;transition:all .15s;white-space:nowrap}
 .mode-btn:hover{border-color:var(--accent);color:var(--accent)}
@@ -129,8 +141,10 @@ main{min-width:0}
 
 .callout{background:var(--bg3);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:4px;padding:10px 14px;margin-top:12px;font-size:12px;color:var(--text2);line-height:1.6}
 .callout.hint{border-left-color:var(--amber)}
+.callout.method{border-left-color:var(--purple)}
 .callout-label{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:4px}
 .callout.hint .callout-label{color:var(--amber)}
+.callout.method .callout-label{color:var(--purple)}
 
 /* DATA VIEW */
 .data-view{background:var(--bg2);border:1px solid var(--border);border-top:none;overflow:hidden}
@@ -216,8 +230,16 @@ table.flows .col-proto{color:var(--purple)}
 .tab-panel code{font-family:var(--mono);font-size:11px;background:var(--bg);border:1px solid var(--border2);padding:1px 5px;border-radius:3px;color:var(--accent)}
 
 .mitre-list{display:flex;flex-direction:column;gap:8px}
+.mitre-section-label{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px}
+.mitre-section-label.related{margin-top:18px;color:var(--purple)}
+.mitre-tag{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:5px}
+.mitre-tag.related{background:var(--bg2);border-style:dashed}
+.mitre-name-wrap{display:flex;flex-direction:column;gap:2px}
+.mitre-note{font-size:11px;color:var(--text3);font-style:italic}
+.mitre-method-note{font-family:var(--mono);font-size:11px;color:var(--text3);line-height:1.6;margin-top:14px;padding:10px 12px;background:rgba(188,140,255,.06);border-left:2px solid var(--purple);border-radius:0 4px 4px 0}
 .mitre-tag{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:5px}
 .mitre-id{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--amber);background:rgba(210,153,34,.1);border:1px solid rgba(210,153,34,.3);border-radius:3px;padding:2px 7px;flex-shrink:0}
+.mitre-id.rel{color:var(--purple);background:rgba(188,140,255,.08);border-color:rgba(188,140,255,.3)}
 .mitre-name{font-size:12px;color:var(--text)}
 
 .detect-block{background:var(--bg);border:1px solid var(--border2);border-radius:6px;overflow:hidden;margin-bottom:10px}
@@ -286,6 +308,13 @@ table.flows .col-proto{color:var(--purple)}
   <button class="reset-btn" id="btn-reset">↻ Reset Run</button>
 </div>
 
+<div class="method-banner" id="method-banner">
+  <div class="method-banner-inner">
+    <span class="method-banner-label">▸ Methodology Note</span>
+    <p>Real hunts rarely map to a single MITRE technique. A scenario titled "exfiltration" might involve text storage (T1567.003), cloud storage (T1567.002), and non-C2 protocol exfil (T1048.003) all at once. When you reference the matrix, look at <strong>adjacent techniques</strong> within the same tactic, not just the most obvious one. Tunnel vision on one ID is the most common rookie mistake. <span class="method-banner-meta">Tutorial mode only. Switch to Challenge to hide.</span></p>
+  </div>
+</div>
+
 <div class="container">
 
   <aside class="sidebar">
@@ -311,12 +340,7 @@ table.flows .col-proto{color:var(--purple)}
 /* ============================================================
    TODO · SCENARIO IDEAS (build when inspired)
    ============================================================
-   ✓ DONE in launch library:
-     · LLMNR/NBT-NS poisoning            → SCN-010
-     · JA3 fingerprint anomaly           → SCN-011
-     · low-signal subtle anomaly         → SCN-012
-
-   Still on deck:
+   On deck:
    - Pass-the-Hash / NTLM relay (Kerberos absence + SMB pattern)
    - DCSync replication request (kerberos + DRSUAPI)
    - Domain Generation Algorithm beacons (DNS view with DGA strings)
@@ -394,6 +418,10 @@ const SCENARIOS = [
       { id: 'T1048.003', name: 'Exfiltration over Unencrypted Non-C2 Protocol' },
       { id: 'T1568.002', name: 'Domain Generation Algorithms' },
     ],
+    relatedTechniques: [
+      { id: 'T1095', name: 'Non-Application Layer Protocol', note: 'broader covert channel category' },
+      { id: 'T1573.001', name: 'Symmetric Cryptography', note: 'if encrypted payload is observed in TXT data' },
+    ],
     detection: [
       { tool: 'arkime', label: 'Arkime', code: 'dns.qt == TXT && dns.host == "*.tunnel-svc.io"' },
       { tool: 'kibana', label: 'Kibana (KQL)', code: 'dns.question.type:"TXT" AND dns.question.name:*.tunnel-svc.io' },
@@ -468,6 +496,10 @@ const SCENARIOS = [
     mitre: [
       { id: 'T1190', name: 'Exploit Public-Facing Application' },
       { id: 'T1505.003', name: 'Server Software Component: Web Shell' },
+    ],
+    relatedTechniques: [
+      { id: 'T1059', name: 'Command and Scripting Interpreter', note: 'webshell payload would invoke this on success' },
+      { id: 'T1083', name: 'File and Directory Discovery', note: 'the path traversal attempt fits here too' },
     ],
     detection: [
       { tool: 'arkime',   label: 'Arkime',       code: 'http.uri == "*UNION*SELECT*" || http.uri == "*../*" || http.user-agent == "*sqlmap*"' },
@@ -544,6 +576,10 @@ const SCENARIOS = [
       { id: 'T1021.006', name: 'Remote Services: Windows Remote Management' },
       { id: 'T1570',     name: 'Lateral Tool Transfer' },
     ],
+    relatedTechniques: [
+      { id: 'T1059.001', name: 'Command and Scripting Interpreter: PowerShell', note: 'WinRM is the transport, PowerShell is the payload' },
+      { id: 'T1078', name: 'Valid Accounts', note: 'lateral movement via WinRM requires creds' },
+    ],
     detection: [
       { tool: 'arkime',   label: 'Arkime',       code: 'ip.src == 10.10.20.55 && port.dst == 5985' },
       { tool: 'kibana',   label: 'Kibana (KQL)', code: 'source.ip:"10.10.20.55" AND destination.port:(5985 OR 5986)' },
@@ -614,6 +650,10 @@ const SCENARIOS = [
       { id: 'T1213.001', name: 'Data from Information Repositories: Confluence' },
       { id: 'T1119',     name: 'Automated Collection' },
     ],
+    relatedTechniques: [
+      { id: 'T1530', name: 'Data from Cloud Storage', note: 'if Confluence were cloud-hosted' },
+      { id: 'T1083', name: 'File and Directory Discovery', note: 'enumeration step that would precede bulk export' },
+    ],
     detection: [
       { tool: 'arkime',   label: 'Arkime',       code: 'ip.src == 10.10.30.42 && ip.dst == 10.10.40.15 && databytes > 5000000' },
       { tool: 'kibana',   label: 'Kibana (KQL)', code: 'source.ip:"10.10.30.42" AND destination.ip:"10.10.40.15" AND network.bytes > 5000000' },
@@ -648,6 +688,10 @@ const SCENARIOS = [
     mitre: [
       { id: 'T1567.002', name: 'Exfiltration to Cloud Storage' },
       { id: 'T1048.003', name: 'Exfiltration Over Unencrypted Non-C2 Protocol' },
+    ],
+    relatedTechniques: [
+      { id: 'T1567.003', name: 'Exfiltration to Text Storage Sites', note: 'pastebin and similar text-paste services' },
+      { id: 'T1567', name: 'Exfiltration Over Web Service', note: 'parent technique covering several of these flows' },
     ],
     detection: [
       { tool: 'arkime',   label: 'Arkime',       code: 'http.host == "*.mega.nz" || http.host == "*.bunkr.la" || http.host == "pastebin.com"' },
@@ -728,6 +772,10 @@ const SCENARIOS = [
       { id: 'T1090.004', name: 'Proxy: Domain Fronting' },
       { id: 'T1573.002', name: 'Encrypted Channel: Asymmetric Cryptography' },
     ],
+    relatedTechniques: [
+      { id: 'T1027', name: 'Obfuscated Files or Information', note: 'JA3 mimicry is a related evasion concept' },
+      { id: 'T1102', name: 'Web Service', note: 'CDN abuse for C2 staging falls here' },
+    ],
     detection: [
       { tool: 'arkime',   label: 'Arkime',       code: 'tls.ja3 == "e7d705a3286e19ea42f587b344ee6865"' },
       { tool: 'kibana',   label: 'Kibana (KQL)', code: 'tls.client.ja3:"e7d705a3286e19ea42f587b344ee6865" AND NOT user_agent.original:(*Chrome* OR *Firefox*)' },
@@ -769,6 +817,10 @@ const SCENARIOS = [
       { id: 'T1583.001', name: 'Acquire Infrastructure: Domains (typosquatting)' },
       { id: 'T1071.001', name: 'Application Layer Protocol: Web Protocols' },
       { id: 'T1036.005', name: 'Masquerading: Match Legitimate Name or Location' },
+    ],
+    relatedTechniques: [
+      { id: 'T1566.002', name: 'Phishing: Spearphishing Link', note: 'typosquats often arrive via phishing first' },
+      { id: 'T1056.003', name: 'Input Capture: Web Portal Capture', note: 'if the typosquat hosts a credential harvester' },
     ],
     detection: [
       { tool: 'arkime',   label: 'Arkime',       code: 'tls.ja3.host == "outloook.office365.com"' },
@@ -910,7 +962,7 @@ function renderInstructions() {
     <div class="callout">
       <span class="callout-label">▸ Instructions</span>
       Click rows you believe are malicious. Press <strong>Submit</strong> to evaluate.
-      Use <strong>Hint</strong> if you're stuck - disabled in challenge mode.
+      Use <strong>Hint</strong> if you're stuck. Hints are disabled in challenge mode.
     </div>
   `;
 }
@@ -1043,6 +1095,7 @@ function renderReveal(sc) {
       </div>
 
       <div class="tab-panel ${state.activeTab === 'mitre' ? 'active' : ''}" data-panel="mitre">
+        <div class="mitre-section-label">Primary techniques covered:</div>
         <div class="mitre-list">
           ${sc.mitre.map(m => `
             <div class="mitre-tag">
@@ -1051,10 +1104,25 @@ function renderReveal(sc) {
             </div>
           `).join('')}
         </div>
+        ${state.mode === 'tutorial' && sc.relatedTechniques && sc.relatedTechniques.length ? `
+          <div class="mitre-section-label related">Also worth checking on the matrix:</div>
+          <div class="mitre-list">
+            ${sc.relatedTechniques.map(m => `
+              <div class="mitre-tag related">
+                <span class="mitre-id rel">${m.id}</span>
+                <div class="mitre-name-wrap">
+                  <span class="mitre-name">${m.name}</span>
+                  ${m.note ? `<span class="mitre-note">${m.note}</span>` : ''}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+          <p class="mitre-method-note">▸ These aren't the "answer" for this scenario, but a thoughtful hunter would touch them while investigating. Real activity rarely sits in just one box.</p>
+        ` : ''}
       </div>
 
       <div class="tab-panel ${state.activeTab === 'detect' ? 'active' : ''}" data-panel="detect">
-        <p style="color:var(--text3);font-size:11px;margin-bottom:12px;">Paste-ready detection logic. Variables like <code>$HOME_NET</code> are placeholders - replace with values from your environment.</p>
+        <p style="color:var(--text3);font-size:11px;margin-bottom:12px;">Paste-ready detection logic. Variables like <code>$HOME_NET</code> are placeholders: replace with values from your environment.</p>
         ${sc.detection.map((d, i) => `
           <div class="detect-block">
             <div class="detect-hdr">
@@ -1228,12 +1296,19 @@ function resetRun() {
 /* ============================================================
    MODE + RESET
    ============================================================ */
+function updateMethodBanner() {
+  const banner = document.getElementById('method-banner');
+  if (!banner) return;
+  banner.classList.toggle('hidden', state.mode !== 'tutorial');
+}
+
 $$('.mode-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     $$('.mode-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     state.mode = btn.dataset.mode;
     state.hintShown = false;
+    updateMethodBanner();
     render();
   });
 });
@@ -1249,7 +1324,7 @@ $('#btn-reset').addEventListener('click', () => {
    BOOT SEQUENCE
    ============================================================ */
 const BOOT_LINES = [
-  { t: 0,   txt: '[DETECT] cold boot · session id 0x4A2F', cls: '' },
+  { t: 0,   txt: '[6B74-DETECT] cold boot · session id 0x6B74', cls: '' },
   { t: 80,  txt: 'loading scenario index ........................', cls: '' },
   { t: 220, txt: '  ▸ ' + SCENARIOS.length + ' scenario(s) registered', cls: 'boot-ok' },
   { t: 320, txt: 'mounting flow.records ........................', cls: '' },
