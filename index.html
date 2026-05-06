@@ -876,8 +876,10 @@ function renderSidebar() {
       state.revealed = !!state.results[idx];
       state.hintShown = false;
       state.activeTab = 'analysis';
-      // If revisiting a done scenario, repopulate selected with what they picked? Skip for v1 - just show explanation fresh.
-      if (state.revealed) state.selected = new Set(SCENARIOS[idx].malicious);
+      // Restore the user's actual selection so they see their hits, misses, and false positives
+      if (state.revealed && state.results[idx].selected) {
+        state.selected = new Set(state.results[idx].selected);
+      }
       render();
     });
   });
@@ -1011,7 +1013,9 @@ function renderControls(sc) {
 }
 
 function renderReveal(sc) {
-  const r = scoreScenario(sc);
+  // Prefer the stored historical result (so revisits show what the user actually scored,
+  // not a fresh recompute against the now-restored selection)
+  const r = state.results[state.scenarioIdx] || scoreScenario(sc);
   const tone = r.score >= 80 ? '' : r.score >= 50 ? 'partial' : 'fail';
   const verdict = r.score >= 80 ? 'CONFIRMED' : r.score >= 50 ? 'PARTIAL' : 'INCONCLUSIVE';
   const vClass = r.score >= 80 ? 'v-confirmed' : r.score >= 50 ? 'v-partial' : 'v-incon';
@@ -1154,6 +1158,7 @@ function bindControls(sc) {
     state.revealed = true;
     state.activeTab = 'analysis';
     const r = scoreScenario(sc);
+    r.selected = Array.from(state.selected);  // preserve what the user actually picked
     state.totalScore += r.score;
     state.totalHits += r.hits;
     state.totalMisses += r.misses;
@@ -1244,7 +1249,7 @@ $('#btn-reset').addEventListener('click', () => {
    BOOT SEQUENCE
    ============================================================ */
 const BOOT_LINES = [
-  { t: 0,   txt: '[6B74-DETECT] cold boot · session id 0x6B74', cls: '' },
+  { t: 0,   txt: '[DETECT] cold boot · session id 0x4A2F', cls: '' },
   { t: 80,  txt: 'loading scenario index ........................', cls: '' },
   { t: 220, txt: '  ▸ ' + SCENARIOS.length + ' scenario(s) registered', cls: 'boot-ok' },
   { t: 320, txt: 'mounting flow.records ........................', cls: '' },
