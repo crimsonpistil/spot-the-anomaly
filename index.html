@@ -1368,7 +1368,9 @@ $('#btn-reset').addEventListener('click', () => {
    BOOT SEQUENCE
    ============================================================ */
 const BOOT_LINES = [
-  { t: 0,   txt: '[6B74-DETECT] cold boot · session id 0x6B74', cls: '' },
+  { t: 0,   txt: 'hello :)', cls: '' },
+  { t: 20, txt: '', cls: '' },
+  { t: 40, txt: '', cls: '' },
   { t: 80,  txt: 'loading scenario index ........................', cls: '' },
   { t: 220, txt: '  ▸ ' + SCENARIOS.length + ' scenario(s) registered', cls: 'boot-ok' },
   { t: 320, txt: 'mounting flow.records ........................', cls: '' },
@@ -1378,9 +1380,10 @@ const BOOT_LINES = [
   { t: 760, txt: 'tuning detection rules .......................', cls: '' },
   { t: 920, txt: '  ▸ OK · MITRE ATT&CK v15 mapped', cls: 'boot-ok' },
   { t: 1020, txt: 'arming behavioral analytics ..................', cls: '' },
-  { t: 1180, txt: '  ▸ caffeine levels: critical', cls: 'boot-warn' },
-  { t: 1280, txt: '', cls: '' },
-  { t: 1340, txt: '▸ session ready. happy hunting.', cls: 'boot-ok' },
+  { t: 1280, txt: '  ▸ OK', cls: 'boot.ok' },
+  { t: 1300, txt: '', cls: '' },
+  { t: 1320, txt: '', cls: '' },
+  { t: 1340, txt: '▸ happy hunting.', cls: 'boot-ok' },
 ];
 
 function runBoot() {
