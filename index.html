@@ -112,6 +112,9 @@ header{background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 
 .toc-item.active{background:rgba(31,111,235,.15);color:var(--accent)}
 .toc-item.done{color:var(--text3)}
 .toc-item.done .toc-id{color:var(--green)}
+.toc-item.locked{opacity:.4;cursor:not-allowed}
+.toc-item.locked:hover{background:none;color:var(--text2)}
+.toc-item.locked .toc-mark{color:var(--text3)}
 .toc-id{font-family:var(--mono);font-size:10px;font-weight:600;min-width:46px;color:var(--accent)}
 .toc-name{font-size:11px;flex:1}
 .toc-mark{font-family:var(--mono);font-size:10px;color:var(--text3);margin-left:auto}
@@ -1161,6 +1164,7 @@ const SCENARIOS = [
 const state = {
   mode: 'tutorial',
   scenarioIdx: 0,
+  maxReached: 0,   // furthest index unlocked via sequential (tutorial) play
   selected: new Set(),
   revealed: false,
   hintShown: false,
@@ -1169,8 +1173,89 @@ const state = {
   totalHits: 0,
   totalMisses: 0,
   totalFps: 0,
-  results: {},  // {scenarioIdx: {score, hits, misses, fps}}
+  results: {},  // {scenarioIdx: {score, hits, misses, fps, selected}}
 };
+
+/* ============================================================
+   NAVIGATION + PERSISTENCE
+   ============================================================ */
+const STORAGE_KEY = 'sta_progress_v1';
+
+// A scenario is reachable if we're in challenge mode (free roam),
+// if it's at or below the furthest point reached in the guided path,
+// or if it's already been completed (always reviewable).
+function isUnlocked(idx) {
+  return state.mode === 'challenge' || idx <= state.maxReached || !!state.results[idx];
+}
+
+// Running totals are derived from completed results rather than
+// accumulated, so a mid-run reload reconstructs them correctly and
+// re-visits can never double-count.
+function recomputeTotals() {
+  let score = 0, hits = 0, misses = 0, fps = 0;
+  for (const k of Object.keys(state.results)) {
+    const r = state.results[k];
+    score += r.score; hits += r.hits; misses += r.misses; fps += r.fps;
+  }
+  state.totalScore = score;
+  state.totalHits = hits;
+  state.totalMisses = misses;
+  state.totalFps = fps;
+}
+
+// Persist completed results + position, keyed by scenario id so the
+// save stays valid if scenarios are added or reordered later.
+function persist() {
+  try {
+    const resultsById = {};
+    for (const k of Object.keys(state.results)) {
+      const sc = SCENARIOS[k];
+      if (sc) resultsById[sc.id] = state.results[k];
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      v: 1,
+      mode: state.mode,
+      scenarioIdx: state.scenarioIdx,
+      maxReached: state.maxReached,
+      results: resultsById,
+    }));
+  } catch (e) { /* storage unavailable - run stays in-memory only */ }
+}
+
+function loadState() {
+  let saved;
+  try {
+    saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+  } catch (e) { saved = null; }
+  if (!saved || saved.v !== 1) return;
+
+  if (saved.mode === 'tutorial' || saved.mode === 'challenge') state.mode = saved.mode;
+
+  // Map saved results (keyed by scenario id) back onto current indices.
+  const idToIdx = {};
+  SCENARIOS.forEach((sc, i) => { idToIdx[sc.id] = i; });
+  state.results = {};
+  if (saved.results) {
+    for (const id of Object.keys(saved.results)) {
+      if (id in idToIdx) state.results[idToIdx[id]] = saved.results[id];
+    }
+  }
+
+  const maxIdx = SCENARIOS.length - 1;
+  state.maxReached = Math.min(Math.max(saved.maxReached || 0, 0), maxIdx);
+  // Drop us back where we left off (clamped to a valid scenario).
+  state.scenarioIdx = Math.min(Math.max(saved.scenarioIdx || 0, 0), maxIdx);
+
+  recomputeTotals();
+
+  // If we're returning to an already-completed scenario, reopen it in its
+  // revealed state with the selection the user actually submitted.
+  const r = state.results[state.scenarioIdx];
+  if (r) {
+    state.revealed = true;
+    if (r.selected) state.selected = new Set(r.selected);
+  }
+}
 
 /* ============================================================
    HELPERS
@@ -1227,15 +1312,18 @@ function renderSidebar() {
     const result = state.results[i];
     const isActive = i === state.scenarioIdx;
     const isDone = !!result;
+    const locked = !isUnlocked(i);
     let mark = '';
     if (isDone) {
       const cls = result.score >= 80 ? 'pass' : result.score >= 50 ? 'partial' : 'fail';
       mark = `<span class="toc-mark ${cls}">${result.score}</span>`;
     } else if (isActive) {
       mark = `<span class="toc-mark">▸</span>`;
+    } else if (locked) {
+      mark = `<span class="toc-mark">·</span>`;
     }
     return `
-      <div class="toc-item ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}" data-idx="${i}">
+      <div class="toc-item ${isActive ? 'active' : ''} ${isDone ? 'done' : ''} ${locked ? 'locked' : ''}" data-idx="${i}">
         <span class="toc-id">${sc.id}</span>
         <span class="toc-name">${sc.title}</span>
         ${mark}
@@ -1246,8 +1334,8 @@ function renderSidebar() {
   $$('.toc-item').forEach(el => {
     el.addEventListener('click', () => {
       const idx = parseInt(el.dataset.idx, 10);
-      // Only allow nav to current/done scenarios
-      if (idx > state.scenarioIdx) return;
+      // Free navigation in challenge mode; sequential gating in tutorial.
+      if (!isUnlocked(idx)) return;
       state.scenarioIdx = idx;
       state.selected.clear();
       state.revealed = !!state.results[idx];
@@ -1257,6 +1345,7 @@ function renderSidebar() {
       if (state.revealed && state.results[idx].selected) {
         state.selected = new Set(state.results[idx].selected);
       }
+      persist();
       render();
     });
   });
@@ -1552,21 +1641,21 @@ function bindControls(sc) {
     state.activeTab = 'analysis';
     const r = scoreScenario(sc);
     r.selected = Array.from(state.selected);  // preserve what the user actually picked
-    state.totalScore += r.score;
-    state.totalHits += r.hits;
-    state.totalMisses += r.misses;
-    state.totalFps += r.fps;
     state.results[state.scenarioIdx] = r;
+    recomputeTotals();
+    persist();
     render();
   });
 
   const next = $('#btn-next');
   if (next) next.addEventListener('click', () => {
     state.scenarioIdx++;
+    state.maxReached = Math.max(state.maxReached, state.scenarioIdx);
     state.selected.clear();
     state.revealed = false;
     state.hintShown = false;
     state.activeTab = 'analysis';
+    persist();
     render();
   });
 }
@@ -1606,6 +1695,7 @@ function bindComplete() {
 
 function resetRun() {
   state.scenarioIdx = 0;
+  state.maxReached = 0;
   state.selected.clear();
   state.revealed = false;
   state.hintShown = false;
@@ -1615,6 +1705,7 @@ function resetRun() {
   state.totalMisses = 0;
   state.totalFps = 0;
   state.results = {};
+  try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* no-op */ }
   render();
 }
 
@@ -1634,6 +1725,7 @@ $$('.mode-btn').forEach(btn => {
     state.mode = btn.dataset.mode;
     state.hintShown = false;
     updateMethodBanner();
+    persist();
     render();
   });
 });
@@ -1698,6 +1790,13 @@ function runBoot() {
 }
 
 /* INIT */
+function syncModeUI() {
+  $$('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === state.mode));
+  updateMethodBanner();
+}
+
+loadState();
+syncModeUI();
 runBoot().then(render);
 </script>
 </body>
