@@ -1886,22 +1886,12 @@ $('#btn-reset').addEventListener('click', () => {
    BOOT SEQUENCE
    ============================================================ */
 const BOOT_LINES = [
-  { t: 0,   txt: 'hello :)', cls: '' },
+  { t: 0,  txt: '', cls: '' },
   { t: 20, txt: '', cls: '' },
-  { t: 40, txt: '', cls: '' },
-  { t: 80,  txt: 'loading scenario index ........................', cls: '' },
-  { t: 220, txt: '  ▸ ' + SCENARIOS.length + ' scenario(s) registered', cls: 'boot-ok' },
-  { t: 320, txt: 'mounting flow.records ........................', cls: '' },
-  { t: 460, txt: '  ▸ OK', cls: 'boot-ok' },
-  { t: 540, txt: 'mounting log.stream ..........................', cls: '' },
-  { t: 680, txt: '  ▸ OK', cls: 'boot-ok' },
-  { t: 760, txt: 'tuning detection rules .......................', cls: '' },
-  { t: 920, txt: '  ▸ OK · MITRE ATT&CK v15 mapped', cls: 'boot-ok' },
-  { t: 1020, txt: 'arming behavioral analytics ..................', cls: '' },
-  { t: 1280, txt: '  ▸ OK', cls: 'boot.ok' },
-  { t: 1300, txt: '', cls: '' },
-  { t: 1320, txt: '', cls: '' },
-  { t: 1340, txt: '▸ happy hunting.', cls: 'boot-ok' },
+  { t: 40, txt: '▸ happy hunting.', cls: 'boot-ok' },
+  { t: 700, txt: '', cls: '' },
+  { t: 720, txt: '', cls: '' },
+  { t: 760, txt: '', cls: '' },
 ];
 
 function runBoot() {
