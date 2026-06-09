@@ -361,6 +361,125 @@ table.flows .col-proto{color:var(--purple)}
    ============================================================ */
 
 const SCENARIOS = [
+
+  /* ====== SCN-021 · INITIAL ACCESS · Phishing Credential Harvest ====== */
+  {
+    id: 'SCN-021',
+    title: 'Phishing Credential Harvest',
+    difficulty: 'EASY',
+    viewType: 'logs',
+    brief: 'A user reported a suspicious "your mailbox is almost full" email with a login link. Pull the web proxy logs for the click-through. Identify the requests where users landed on a credential-harvesting page and submitted their credentials. Genuine Microsoft 365 sign-ins are present for contrast.',
+    rows: [
+      { time: '09:02:11', src: 'proxy.log', msg: '10.10.20.31 → GET https://www.bing.com/search?q=mailbox+full 200' },
+      { time: '09:03:42', src: 'proxy.log', msg: '10.10.20.31 → GET https://login-microsoft365-secure.com/auth?id=ZmluYW5jZQ 200' },
+      { time: '09:03:58', src: 'proxy.log', msg: '10.10.20.31 → POST https://login-microsoft365-secure.com/validate 200' },
+      { time: '09:04:11', src: 'proxy.log', msg: '10.10.20.31 → GET https://login.microsoftonline.com/common/oauth2/authorize 302' },
+      { time: '09:08:02', src: 'proxy.log', msg: '10.10.20.42 → GET https://outlook.office365.com/owa/ 200' },
+      { time: '09:11:33', src: 'proxy.log', msg: '10.10.20.42 → GET https://login-microsoft365-secure.com/auth?id=aHIyMg 200' },
+      { time: '09:11:51', src: 'proxy.log', msg: '10.10.20.42 → POST https://login-microsoft365-secure.com/validate 200' },
+      { time: '09:14:02', src: 'proxy.log', msg: '10.10.20.55 → GET https://teams.microsoft.com/_ 200' },
+      { time: '09:18:41', src: 'proxy.log', msg: '10.10.20.31 → GET https://login-microsoft365-secure.com/mfa 200' },
+      { time: '09:18:55', src: 'proxy.log', msg: '10.10.20.31 → POST https://login-microsoft365-secure.com/mfa 200' },
+      { time: '09:22:14', src: 'proxy.log', msg: '10.10.20.66 → GET https://github.com/ 200' },
+      { time: '09:25:02', src: 'proxy.log', msg: '10.10.20.42 → GET https://login.microsoftonline.com/common 200' },
+    ],
+    malicious: [1, 2, 5, 6, 8, 9],
+    hint: 'Read the <strong>domain</strong>, not the brand name in it. Microsoft sign-ins go to <code>login.microsoftonline.com</code> and <code>*.office365.com</code>. A domain that merely contains the words "microsoft365" is not Microsoft. Then watch for the <strong>POST</strong> right after the landing page - that is the credential submission.',
+    explanation: 'Two users landed on <code>login-microsoft365-secure.com</code> and submitted credentials to it. The shape is textbook phishing: a GET to the lookalike landing page (<code>/auth?id=...</code>, where the id is a base64-encoded hint identifying the target), immediately followed by a POST to <code>/validate</code> carrying the captured username and password. For user <code>10.10.20.31</code> there is a third beat - a <code>/mfa</code> page and POST - which is an adversary-in-the-middle relay capturing the one-time code and the resulting session, so MFA does not save the account here. The contrast rows are genuine Microsoft: <code>login.microsoftonline.com</code>, <code>outlook.office365.com</code>, and <code>teams.microsoft.com</code> are the real services and must not be flagged. The lesson for newer analysts: the brand string inside a domain is not the domain. Compare the full registrable domain against a known-good allowlist, and treat a credential POST to anything outside it as compromise until proven otherwise.',
+    mitre: [
+      { id: 'T1566.002', name: 'Phishing: Spearphishing Link' },
+      { id: 'T1078',     name: 'Valid Accounts' },
+      { id: 'T1539',     name: 'Steal Web Session Cookie' },
+    ],
+    relatedTechniques: [
+      { id: 'T1557', name: 'Adversary-in-the-Middle', note: 'the /mfa relay sits between the user and real Microsoft' },
+      { id: 'T1556.006', name: 'Modify Authentication Process: Multi-Factor Authentication', note: 'why MFA did not stop the takeover' },
+    ],
+    detection: [
+      { tool: 'arkime',   label: 'Arkime',       code: 'host.http == "login-microsoft365-secure.com"' },
+      { tool: 'kibana',   label: 'Kibana (KQL)', code: 'destination.domain:"login-microsoft365-secure.com" OR (http.request.method:"POST" AND url.path:("/validate" OR "/mfa") AND NOT destination.domain:(*.microsoftonline.com OR *.office365.com))' },
+      { tool: 'suricata', label: 'Suricata',     code: 'alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"Phishing - credential POST to Microsoft 365 lookalike"; flow:to_server; http.host; content:"login-microsoft365-secure.com"; nocase; sid:1000021;)' },
+    ],
+  },
+
+  /* ====== SCN-022 · INITIAL ACCESS · Drive-by Fake Update ====== */
+  {
+    id: 'SCN-022',
+    title: 'Drive-by Fake Update',
+    difficulty: 'EASY',
+    viewType: 'logs',
+    brief: 'A user mentioned a "Chrome is out of date" popup while reading a news site, then ran the update. Review the proxy logs for a drive-by compromise: a redirect off a legitimate site into a fake-update payload and its first call home.',
+    rows: [
+      { time: '13:02:11', src: 'proxy.log', msg: '10.10.20.31 → GET https://www.localnews-example.com/article/8841 200' },
+      { time: '13:02:12', src: 'proxy.log', msg: '10.10.20.31 → GET https://cdn.localnews-example.com/ads/loader.js 200' },
+      { time: '13:02:13', src: 'proxy.log', msg: '10.10.20.31 → GET https://traffic-redirect-cdn.top/r?u=b64 302' },
+      { time: '13:02:13', src: 'proxy.log', msg: '10.10.20.31 → GET https://update-chrome-now.xyz/landing 200' },
+      { time: '13:02:25', src: 'proxy.log', msg: '10.10.20.31 → GET https://update-chrome-now.xyz/Chrome.Update.js 200' },
+      { time: '13:02:41', src: 'proxy.log', msg: '10.10.20.31 → GET https://update-chrome-now.xyz/download/ChromeSetup.zip 200' },
+      { time: '13:04:02', src: 'proxy.log', msg: '10.10.20.31 → GET https://www.localnews-example.com/article/8842 200' },
+      { time: '13:06:11', src: 'proxy.log', msg: '10.10.20.42 → GET https://www.google.com/ 200' },
+      { time: '13:08:33', src: 'proxy.log', msg: '10.10.20.31 → POST https://update-chrome-now.xyz/gate.php 200' },
+      { time: '13:11:02', src: 'proxy.log', msg: '10.10.20.55 → GET https://en.wikipedia.org/wiki/Maryland 200' },
+      { time: '13:14:41', src: 'proxy.log', msg: '10.10.20.31 → POST https://update-chrome-now.xyz/gate.php 200' },
+    ],
+    malicious: [2, 3, 4, 5, 8, 10],
+    hint: 'Follow the <strong>chain</strong>. A legitimate page leads to a <strong>302 redirect</strong> through a throwaway domain, which lands on a site offering a "browser update". Browsers do not update themselves by downloading a script and a zip from a <code>.xyz</code> domain. After the payload runs, look for it <strong>calling home</strong>.',
+    explanation: 'This is a drive-by compromise (SocGholish-style fake update). The user is reading a legitimate news site when a redirect fires: <code>traffic-redirect-cdn.top</code> issues a 302 into <code>update-chrome-now.xyz</code>, which serves a fake-update landing page, a <code>Chrome.Update.js</code> script, and a <code>ChromeSetup.zip</code> payload. Once executed, the payload calls home with repeated POSTs to <code>/gate.php</code> on the same domain - the first C2 check-ins. Real Chrome updates ship silently through Google\'s own infrastructure; they never arrive as a script-plus-zip from a freshly registered <code>.xyz</code> domain reached via an ad redirect. The benign rows are the actual news articles, ordinary browsing (Google, Wikipedia), and - the one trap - the news site\'s own ad loader (<code>cdn.localnews-example.com/ads/loader.js</code>), which sits on the publisher\'s legitimate domain and should not be flagged. The point for newer analysts: the malicious domain is obvious once you stop reading "chrome" and "update" as reassurance and start reading the registrable domain and the file types.',
+    mitre: [
+      { id: 'T1189',     name: 'Drive-by Compromise' },
+      { id: 'T1204.002', name: 'User Execution: Malicious File' },
+      { id: 'T1105',     name: 'Ingress Tool Transfer' },
+    ],
+    relatedTechniques: [
+      { id: 'T1036.005', name: 'Masquerading: Match Legitimate Name or Location', note: 'the payload poses as a Chrome update' },
+      { id: 'T1071.001', name: 'Application Layer Protocol: Web Protocols', note: 'the /gate.php POSTs are the C2 channel' },
+    ],
+    detection: [
+      { tool: 'arkime',   label: 'Arkime',       code: 'host.http == "update-chrome-now.xyz" || host.http == "traffic-redirect-cdn.top"' },
+      { tool: 'kibana',   label: 'Kibana (KQL)', code: 'destination.domain:("update-chrome-now.xyz" OR "traffic-redirect-cdn.top") OR url.path:"/gate.php"' },
+      { tool: 'suricata', label: 'Suricata',     code: 'alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"Drive-by - fake browser update payload host"; flow:to_server; http.host; content:"update-chrome-now.xyz"; nocase; sid:1000022;)' },
+    ],
+  },
+
+  /* ====== SCN-023 · INITIAL ACCESS · Impossible-Travel Login ====== */
+  {
+    id: 'SCN-023',
+    title: 'Impossible-Travel Login',
+    difficulty: 'EASY',
+    viewType: 'logs',
+    brief: 'SSO sign-in logs for the corporate identity provider over one morning. Most staff sign in from the Baltimore area on managed devices. Identify the sign-ins consistent with account takeover - a valid account being used from somewhere it cannot physically be.',
+    rows: [
+      { time: '08:02:11', src: 'sso.log', msg: 'SUCCESS user=alice src=72.21.84.19 geo="Baltimore, US" device=managed' },
+      { time: '08:05:42', src: 'sso.log', msg: 'SUCCESS user=bob src=72.21.84.31 geo="Baltimore, US" device=managed' },
+      { time: '08:09:14', src: 'sso.log', msg: 'SUCCESS user=carol src=98.4.112.7 geo="Towson, US" device=managed' },
+      { time: '08:11:02', src: 'sso.log', msg: 'SUCCESS user=alice src=185.220.101.47 geo="Frankfurt, DE" device=unmanaged' },
+      { time: '08:14:33', src: 'sso.log', msg: 'FAILED  user=dave src=102.89.34.6 geo="Lagos, NG" device=unmanaged' },
+      { time: '08:18:02', src: 'sso.log', msg: 'SUCCESS user=bob src=45.133.1.88 geo="Moscow, RU" device=unmanaged' },
+      { time: '08:22:14', src: 'sso.log', msg: 'SUCCESS user=erin src=98.4.112.9 geo="Towson, US" device=managed' },
+      { time: '08:31:41', src: 'sso.log', msg: 'SUCCESS user=frank src=81.2.69.142 geo="London, GB" device=managed' },
+      { time: '08:44:02', src: 'sso.log', msg: 'SUCCESS user=alice src=185.220.101.47 geo="Frankfurt, DE" device=unmanaged' },
+      { time: '09:02:33', src: 'sso.log', msg: 'SUCCESS user=carol src=98.4.112.7 geo="Towson, US" device=managed' },
+      { time: '09:14:11', src: 'sso.log', msg: 'SUCCESS user=bob src=45.133.1.88 geo="Moscow, RU" device=unmanaged' },
+      { time: '09:31:55', src: 'sso.log', msg: 'SUCCESS user=alice src=185.220.101.47 geo="Frankfurt, DE" device=unmanaged' },
+    ],
+    malicious: [3, 5, 8, 10, 11],
+    hint: 'For each account, ask whether the locations are <strong>physically reachable</strong> in the time between sign-ins. A successful login from another continent minutes after a local one is impossible travel. Two signals reinforce it: an <strong>unmanaged device</strong> and an IP in a <strong>hosting or anonymizer</strong> range. A failed attempt is not access, and a single trip on a managed device is just a trip.',
+    explanation: 'Two accounts show impossible travel. <code>alice</code> signs in from Baltimore at 08:02, then from Frankfurt at 08:11 - nine minutes later and an ocean away - and continues from Frankfurt twice more, each from an unmanaged device on a known anonymizer-range IP. <code>bob</code> follows the same shape: Baltimore at 08:05, then Moscow at 08:18 and again later. These are valid credentials being used by someone who is not the user, the classic post-phishing account-takeover signature. The two traps are the teaching points: <code>dave</code>\'s sign-in from Lagos is a <strong>FAILED</strong> attempt, so no access was granted - it is noise, not a compromise; and <code>frank</code>\'s single London sign-in is on a <strong>managed device</strong> with no conflicting same-time local session, which is just an employee traveling. Flagging either of those is a false positive. The discipline this builds: impossible travel is a correlation across two events for the same identity (distance over time), reinforced by device posture and IP reputation - not a property of any single log line. A SIEM rule computes the velocity; your job is to recognize the pattern and rule out the benign traveler.',
+    mitre: [
+      { id: 'T1078',     name: 'Valid Accounts' },
+      { id: 'T1133',     name: 'External Remote Services' },
+    ],
+    relatedTechniques: [
+      { id: 'T1539', name: 'Steal Web Session Cookie', note: 'a likely source of the valid session used here' },
+      { id: 'T1090', name: 'Proxy', note: 'the foreign IPs sit in anonymizer/hosting ranges' },
+    ],
+    detection: [
+      { tool: 'arkime',   label: 'Arkime',       code: 'host.http == "sso.corp.example.com" && country.src != "United States"' },
+      { tool: 'kibana',   label: 'Kibana (KQL)', code: 'event.dataset:"sso" AND event.outcome:"success" AND device.managed:false AND NOT source.geo.country_iso_code:"US"' },
+      { tool: 'suricata', label: 'Suricata',     code: 'alert http $EXTERNAL_NET any -> $SSO_SERVERS any (msg:"SSO success from unexpected geography - possible account takeover"; flow:to_server; geoip:src,RU,DE; sid:1000023;)' },
+    ],
+  },
+
   {
     id: 'SCN-001',
     title: 'Suspected C2 Beaconing',
@@ -1194,6 +1313,17 @@ function isUnlocked(idx) {
   return state.mode === 'challenge' || idx <= state.maxReached || !!state.results[idx];
 }
 
+// Open a scenario: set the index and reset the per-scenario view state,
+// restoring the submitted selection if that scenario was already completed.
+function enterScenario(idx) {
+  state.scenarioIdx = idx;
+  state.hintShown = false;
+  state.activeTab = 'analysis';
+  const r = state.results[idx];
+  state.revealed = !!r;
+  state.selected = (r && r.selected) ? new Set(r.selected) : new Set();
+}
+
 // Running totals are derived from completed results rather than
 // accumulated, so a mid-run reload reconstructs them correctly and
 // re-visits can never double-count.
@@ -1352,15 +1482,7 @@ function renderSidebar() {
       const idx = parseInt(el.dataset.idx, 10);
       // Free navigation in challenge mode; sequential gating in tutorial.
       if (!isUnlocked(idx)) return;
-      state.scenarioIdx = idx;
-      state.selected.clear();
-      state.revealed = !!state.results[idx];
-      state.hintShown = false;
-      state.activeTab = 'analysis';
-      // Restore the user's actual selection so they see their hits, misses, and false positives
-      if (state.revealed && state.results[idx].selected) {
-        state.selected = new Set(state.results[idx].selected);
-      }
+      enterScenario(idx);
       persist();
       render();
     });
@@ -1739,6 +1861,13 @@ $$('.mode-btn').forEach(btn => {
     $$('.mode-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     state.mode = btn.dataset.mode;
+    // Leaving challenge for tutorial: if we're parked on a scenario the
+    // tutorial path hasn't unlocked (reached only via free-roam), drop back
+    // to the furthest legitimately-reached point instead of stranding the
+    // user on a locked scenario.
+    if (state.mode === 'tutorial' && !isUnlocked(state.scenarioIdx)) {
+      enterScenario(state.maxReached);
+    }
     state.hintShown = false;
     updateMethodBanner();
     persist();
