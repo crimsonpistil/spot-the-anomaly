@@ -115,6 +115,11 @@ header{background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 
 .toc-item.locked{opacity:.4;cursor:not-allowed}
 .toc-item.locked:hover{background:none;color:var(--text2)}
 .toc-item.locked .toc-mark{color:var(--text3)}
+.toc-stage{font-family:var(--mono);font-size:9px;font-weight:700;color:var(--text3);min-width:16px;text-align:right}
+.toc-item.active .toc-stage{color:var(--accent)}
+.toc-item.done .toc-stage{color:var(--green)}
+.toc-tier{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--text3);text-transform:uppercase;padding:8px 8px 3px;margin-top:4px;border-top:1px solid var(--border)}
+.toc-tier:first-child{margin-top:0;border-top:none}
 .toc-id{font-family:var(--mono);font-size:10px;font-weight:600;min-width:46px;color:var(--accent)}
 .toc-name{font-size:11px;flex:1}
 .toc-mark{font-family:var(--mono);font-size:10px;color:var(--text3);margin-left:auto}
@@ -391,6 +396,45 @@ const SCENARIOS = [
       { tool: 'suricata', label: 'Suricata', code: 'alert tcp $HOME_NET any -> 185.220.101.0/24 any (msg:"Possible C2 beacon to Tor exit"; flow:established; threshold:type both, track by_src, count 3, seconds 600; sid:1000001;)' },
     ],
   },
+
+  /* ====== SCN-003 · RECON · Active Scanning ====== */
+  {
+    id: 'SCN-003',
+    title: 'External Port Sweep',
+    difficulty: 'EASY',
+    viewType: 'flows',
+    brief: 'Perimeter firewall logs show unusual inbound activity targeting the DMZ web server <strong>198.51.100.20</strong>. Identify connection attempts consistent with reconnaissance scanning.',
+    columns: ['#', 'TIME', 'SRC', 'DST', 'PORT', 'PROTO', 'PACKETS', 'BYTES', 'DUR'],
+    rows: [
+      { time: '03:14:02', src: '203.0.113.45', dst: '198.51.100.20', port: 443, proto: 'TCP', pkts: 142, bytes: '380 KB', dur: '6.2s' },
+      { time: '03:14:18', src: '198.18.42.7',  dst: '198.51.100.20', port: 21,   proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
+      { time: '03:14:18', src: '198.18.42.7',  dst: '198.51.100.20', port: 22,   proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
+      { time: '03:14:18', src: '198.18.42.7',  dst: '198.51.100.20', port: 23,   proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
+      { time: '03:14:18', src: '198.18.42.7',  dst: '198.51.100.20', port: 25,   proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
+      { time: '03:14:19', src: '198.18.42.7',  dst: '198.51.100.20', port: 53,   proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
+      { time: '03:14:19', src: '198.18.42.7',  dst: '198.51.100.20', port: 80,   proto: 'TCP', pkts: 4,   bytes: '480 B',  dur: '0.2s' },
+      { time: '03:14:19', src: '198.18.42.7',  dst: '198.51.100.20', port: 110,  proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
+      { time: '03:14:19', src: '198.18.42.7',  dst: '198.51.100.20', port: 143,  proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
+      { time: '03:14:20', src: '198.18.42.7',  dst: '198.51.100.20', port: 443,  proto: 'TCP', pkts: 4,   bytes: '480 B',  dur: '0.2s' },
+      { time: '03:14:20', src: '198.18.42.7',  dst: '198.51.100.20', port: 445,  proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
+      { time: '03:14:20', src: '198.18.42.7',  dst: '198.51.100.20', port: 3389, proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
+      { time: '03:15:44', src: '74.125.224.72',dst: '198.51.100.20', port: 443,  proto: 'TCP', pkts: 88,  bytes: '290 KB', dur: '4.8s' },
+      { time: '03:16:11', src: '203.0.113.99', dst: '198.51.100.20', port: 80,   proto: 'TCP', pkts: 22,  bytes: '14 KB',  dur: '1.2s' },
+    ],
+    malicious: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+    hint: 'Look for a single source attempting many <strong>different ports</strong> in rapid succession. Tiny packet counts and minimal bytes are a tell - the scanner is testing for open services, not transferring data.',
+    explanation: 'Source <code>198.18.42.7</code> issued 11 connection attempts to sequential well-known service ports (21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 3389) within ~2 seconds, each with only 2-4 packets and minimal bytes. This is a classic TCP port sweep - the attacker is probing for open services to identify the attack surface. Real user traffic to the same host would target a single service (usually 80/443) with a sustained data exchange. Rows 01, 13, and 14 show normal HTTPS sessions with healthy byte counts and durations.',
+    mitre: [
+      { id: 'T1595.001', name: 'Active Scanning: Scanning IP Blocks' },
+      { id: 'T1046',     name: 'Network Service Discovery' },
+    ],
+    detection: [
+      { tool: 'arkime',   label: 'Arkime',       code: 'ip.src == 198.18.42.7 && packets.src < 5 && length < 500' },
+      { tool: 'kibana',   label: 'Kibana (KQL)', code: 'source.ip:"198.18.42.7" AND network.packets < 5 AND destination.port:(21 OR 22 OR 23 OR 25 OR 53 OR 110 OR 143 OR 445 OR 3389)' },
+      { tool: 'suricata', label: 'Suricata',     code: 'alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"Possible TCP port sweep"; flags:S; threshold:type both, track by_src, count 10, seconds 60; sid:1000003;)' },
+    ],
+  },
+
   {
     id: 'SCN-002',
     title: 'Anomalous DNS Activity',
@@ -429,44 +473,6 @@ const SCENARIOS = [
       { tool: 'arkime', label: 'Arkime', code: 'dns.qt == TXT && dns.host == "*.tunnel-svc.io"' },
       { tool: 'kibana', label: 'Kibana (KQL)', code: 'dns.question.type:"TXT" AND dns.question.name:*.tunnel-svc.io' },
       { tool: 'suricata', label: 'Suricata', code: 'alert dns $HOME_NET any -> any any (msg:"DNS tunneling - high entropy TXT query"; dns.query; content:"tunnel-svc.io"; nocase; sid:1000002;)' },
-    ],
-  },
-
-  /* ====== SCN-003 · RECON · Active Scanning ====== */
-  {
-    id: 'SCN-003',
-    title: 'External Port Sweep',
-    difficulty: 'EASY',
-    viewType: 'flows',
-    brief: 'Perimeter firewall logs show unusual inbound activity targeting the DMZ web server <strong>198.51.100.20</strong>. Identify connection attempts consistent with reconnaissance scanning.',
-    columns: ['#', 'TIME', 'SRC', 'DST', 'PORT', 'PROTO', 'PACKETS', 'BYTES', 'DUR'],
-    rows: [
-      { time: '03:14:02', src: '203.0.113.45', dst: '198.51.100.20', port: 443, proto: 'TCP', pkts: 142, bytes: '380 KB', dur: '6.2s' },
-      { time: '03:14:18', src: '198.18.42.7',  dst: '198.51.100.20', port: 21,   proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
-      { time: '03:14:18', src: '198.18.42.7',  dst: '198.51.100.20', port: 22,   proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
-      { time: '03:14:18', src: '198.18.42.7',  dst: '198.51.100.20', port: 23,   proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
-      { time: '03:14:18', src: '198.18.42.7',  dst: '198.51.100.20', port: 25,   proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
-      { time: '03:14:19', src: '198.18.42.7',  dst: '198.51.100.20', port: 53,   proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
-      { time: '03:14:19', src: '198.18.42.7',  dst: '198.51.100.20', port: 80,   proto: 'TCP', pkts: 4,   bytes: '480 B',  dur: '0.2s' },
-      { time: '03:14:19', src: '198.18.42.7',  dst: '198.51.100.20', port: 110,  proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
-      { time: '03:14:19', src: '198.18.42.7',  dst: '198.51.100.20', port: 143,  proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
-      { time: '03:14:20', src: '198.18.42.7',  dst: '198.51.100.20', port: 443,  proto: 'TCP', pkts: 4,   bytes: '480 B',  dur: '0.2s' },
-      { time: '03:14:20', src: '198.18.42.7',  dst: '198.51.100.20', port: 445,  proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
-      { time: '03:14:20', src: '198.18.42.7',  dst: '198.51.100.20', port: 3389, proto: 'TCP', pkts: 2,   bytes: '120 B',  dur: '0.1s' },
-      { time: '03:15:44', src: '74.125.224.72',dst: '198.51.100.20', port: 443,  proto: 'TCP', pkts: 88,  bytes: '290 KB', dur: '4.8s' },
-      { time: '03:16:11', src: '203.0.113.99', dst: '198.51.100.20', port: 80,   proto: 'TCP', pkts: 22,  bytes: '14 KB',  dur: '1.2s' },
-    ],
-    malicious: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-    hint: 'Look for a single source attempting many <strong>different ports</strong> in rapid succession. Tiny packet counts and minimal bytes are a tell - the scanner is testing for open services, not transferring data.',
-    explanation: 'Source <code>198.18.42.7</code> issued 11 connection attempts to sequential well-known service ports (21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 3389) within ~2 seconds, each with only 2-4 packets and minimal bytes. This is a classic TCP port sweep - the attacker is probing for open services to identify the attack surface. Real user traffic to the same host would target a single service (usually 80/443) with a sustained data exchange. Rows 01, 13, and 14 show normal HTTPS sessions with healthy byte counts and durations.',
-    mitre: [
-      { id: 'T1595.001', name: 'Active Scanning: Scanning IP Blocks' },
-      { id: 'T1046',     name: 'Network Service Discovery' },
-    ],
-    detection: [
-      { tool: 'arkime',   label: 'Arkime',       code: 'ip.src == 198.18.42.7 && packets.src < 5 && length < 500' },
-      { tool: 'kibana',   label: 'Kibana (KQL)', code: 'source.ip:"198.18.42.7" AND network.packets < 5 AND destination.port:(21 OR 22 OR 23 OR 25 OR 53 OR 110 OR 143 OR 445 OR 3389)' },
-      { tool: 'suricata', label: 'Suricata',     code: 'alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"Possible TCP port sweep"; flags:S; threshold:type both, track by_src, count 10, seconds 60; sid:1000003;)' },
     ],
   },
 
@@ -552,6 +558,207 @@ const SCENARIOS = [
     ],
   },
 
+  /* ====== SCN-008 · COLLECTION · Bulk Confluence Access ====== */
+  {
+    id: 'SCN-008',
+    title: 'Bulk Document Collection',
+    difficulty: 'MEDIUM',
+    viewType: 'flows',
+    brief: 'User <strong>10.10.30.42</strong> accessed the internal Confluence wiki at <strong>10.10.40.15</strong>. Their normal pattern is 5-15 page views per session. Identify activity consistent with bulk content harvesting.',
+    columns: ['#', 'TIME', 'SRC', 'DST', 'PORT', 'PROTO', 'PACKETS', 'BYTES', 'DUR'],
+    rows: [
+      { time: '09:02:14', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 22,   bytes: '14 KB',   dur: '0.8s' },
+      { time: '09:02:52', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 18,   bytes: '11 KB',   dur: '0.6s' },
+      { time: '09:04:02', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 28,   bytes: '18 KB',   dur: '1.1s' },
+      { time: '09:18:33', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 1842, bytes: '8.4 MB',  dur: '14.2s' },
+      { time: '09:18:49', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 1788, bytes: '8.1 MB',  dur: '13.8s' },
+      { time: '09:19:04', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 1922, bytes: '8.7 MB',  dur: '14.6s' },
+      { time: '09:19:21', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 1855, bytes: '8.3 MB',  dur: '14.1s' },
+      { time: '09:19:38', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 1798, bytes: '8.2 MB',  dur: '13.9s' },
+      { time: '09:21:11', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 24,   bytes: '15 KB',   dur: '0.9s' },
+      { time: '09:24:42', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 32,   bytes: '21 KB',   dur: '1.2s' },
+    ],
+    malicious: [3, 4, 5, 6, 7],
+    hint: 'Compare bytes and packets across sessions. Normal wiki browsing pulls KBs per page. <strong>Sustained MB-scale transfers</strong> at regular intervals look more like an automated scraper or API export.',
+    explanation: 'Five sessions (rows 04-08) show a consistent pattern: ~8 MB transferred per connection, ~1800 packets, ~14 seconds duration, occurring roughly 15 seconds apart. This signature is consistent with an attacker using the Confluence REST API or a scraping tool to bulk-export pages - possibly via <code>/rest/api/content?expand=body.storage&limit=100</code>. Normal interactive wiki browsing (rows 01-03, 09-10) shows ~15-20 KB per page view with multi-second gaps between requests as the user reads. The 5x volume jump and rapid cadence strongly indicate automated collection. Whether this is a malicious insider, compromised credentials, or sanctioned bulk export is a separate investigation - but the pattern alone warrants escalation.',
+    mitre: [
+      { id: 'T1213.001', name: 'Data from Information Repositories: Confluence' },
+      { id: 'T1119',     name: 'Automated Collection' },
+    ],
+    relatedTechniques: [
+      { id: 'T1530', name: 'Data from Cloud Storage', note: 'if Confluence were cloud-hosted' },
+      { id: 'T1083', name: 'File and Directory Discovery', note: 'enumeration step that would precede bulk export' },
+    ],
+    detection: [
+      { tool: 'arkime',   label: 'Arkime',       code: 'ip.src == 10.10.30.42 && ip.dst == 10.10.40.15 && databytes > 5000000' },
+      { tool: 'kibana',   label: 'Kibana (KQL)', code: 'source.ip:"10.10.30.42" AND destination.ip:"10.10.40.15" AND network.bytes > 5000000' },
+      { tool: 'suricata', label: 'Suricata',     code: 'alert tcp $HOME_NET any -> $WIKI_SERVERS 443 (msg:"Bulk Confluence egress - large repeated transfer"; flow:established,from_server; threshold:type both, track by_src, count 3, seconds 120; sid:1000008;)' },
+    ],
+  },
+
+  /* ====== SCN-013 · C2 · Cobalt Strike Default Profile ====== */
+  {
+    id: 'SCN-013',
+    title: 'Cobalt Strike Default Profile',
+    difficulty: 'MEDIUM',
+    viewType: 'logs',
+    brief: 'HTTP access logs from the perimeter proxy covering workstation <strong>10.10.20.88</strong>. The host has been flagged by EDR for an unexplained process injection event. Review the web traffic to determine whether C2 activity is present - and if so, identify which sessions belong to the implant rather than the user.',
+    rows: [
+      { time: '09:02:14', src: 'proxy.log', msg: 'GET https://news.bbc.co.uk/ 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"' },
+      { time: '09:03:42', src: 'proxy.log', msg: 'GET https://mail.google.com/mail/u/0/ 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"' },
+      { time: '09:04:18', src: 'proxy.log', msg: 'GET http://203.0.113.88/activity 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
+      { time: '09:04:52', src: 'proxy.log', msg: 'GET https://cdn.jquery.com/jquery-3.7.1.min.js 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"' },
+      { time: '09:05:04', src: 'proxy.log', msg: 'POST http://203.0.113.88/submit.php 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
+      { time: '09:12:11', src: 'proxy.log', msg: 'GET https://outlook.office365.com/owa/ 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"' },
+      { time: '09:14:18', src: 'proxy.log', msg: 'GET http://203.0.113.88/px.gif 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
+      { time: '09:14:52', src: 'proxy.log', msg: 'GET https://docs.microsoft.com/en-us/ 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"' },
+      { time: '09:24:19', src: 'proxy.log', msg: 'GET http://203.0.113.88/activity 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
+      { time: '09:24:53', src: 'proxy.log', msg: 'POST http://203.0.113.88/submit.php 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
+      { time: '09:31:14', src: 'proxy.log', msg: 'GET https://github.com/ 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"' },
+      { time: '09:34:19', src: 'proxy.log', msg: 'GET http://203.0.113.88/px.gif 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
+      { time: '09:34:52', src: 'proxy.log', msg: 'POST http://203.0.113.88/submit.php 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
+      { time: '09:41:55', src: 'proxy.log', msg: 'GET https://www.reddit.com/ 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"' },
+      { time: '09:44:19', src: 'proxy.log', msg: 'GET http://203.0.113.88/activity 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
+      { time: '09:44:52', src: 'proxy.log', msg: 'POST http://203.0.113.88/submit.php 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
+    ],
+    malicious: [2, 4, 6, 8, 9, 11, 12, 14, 15],
+    hint: 'Two things to focus on. First: <strong>user-agent strings</strong>. IE9 on Windows 7 (<code>MSIE 9.0; Windows NT 6.1</code>) hasn\'t been a real browser in over a decade. Second: <strong>URI patterns</strong>. Cross-reference the flagged destination IP against the URIs being requested - some of them have a very specific reputation.',
+    explanation: 'Nine requests to <code>203.0.113.88</code> are issued by a process impersonating IE9 on Windows 7 - a user-agent that hasn\'t reflected a real browser since 2016. The URIs tell the rest of the story: <code>/activity</code> and <code>/px.gif</code> are check-in requests (the beacon polling for tasking), while <code>/submit.php</code> is the data upload path. These three URIs are part of the Cobalt Strike default HTTP Malleable C2 profile, and are so well-known among defenders that any operator still running the default profile is either new or careless. The beacon cycle is visible too: GET /activity, POST /submit.php pairs repeating at roughly 10-minute intervals (09:04, 09:14 partial, 09:24, 09:34, 09:44) with some jitter. The legitimate user traffic interspersed throughout uses a current Chrome UA and hits recognizable destinations - BBC, Gmail, Outlook, GitHub. Two separate processes are making HTTP requests from this host: the user\'s browser, and the implant.',
+    mitre: [
+      { id: 'T1071.001', name: 'Application Layer Protocol: Web Protocols' },
+      { id: 'T1001.001', name: 'Data Obfuscation: Junk Data' },
+      { id: 'T1036.005', name: 'Masquerading: Match Legitimate Name or Location' },
+    ],
+    relatedTechniques: [
+      { id: 'T1055', name: 'Process Injection', note: 'EDR flagged injection before this traffic appeared' },
+      { id: 'T1027.005', name: 'Obfuscated Files or Information: Indicator Removal from Tools', note: 'operators customizing the profile to avoid this detection' },
+    ],
+    detection: [
+      { tool: 'arkime',   label: 'Arkime',       code: 'http.user-agent == "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)" && (http.uri == "/activity" || http.uri == "/submit.php" || http.uri == "/px.gif")' },
+      { tool: 'kibana',   label: 'Kibana (KQL)', code: 'user_agent.original:"Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)" AND url.path:(/activity OR /submit.php OR /px.gif)' },
+      { tool: 'suricata', label: 'Suricata',     code: 'alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"Cobalt Strike default profile UA - MSIE 9.0 Win7"; http.user_agent; content:"MSIE 9.0"; content:"Windows NT 6.1"; within:60; sid:1000013;)' },
+    ],
+  },
+
+  /* ====== SCN-014 · INITIAL ACCESS · RDP Brute Force ====== */
+  {
+    id: 'SCN-014',
+    title: 'RDP Brute Force and Access',
+    difficulty: 'MEDIUM',
+    viewType: 'flows',
+    brief: 'Inbound flows to the DMZ jump host <strong>198.51.100.30</strong>, which exposes RDP (3389/tcp) for remote admin use. Legitimate administrators connect from the internal management subnet <strong>10.10.50.0/24</strong>. Identify activity consistent with a brute-force attack and any session that indicates the attacker got in.',
+    columns: ['#', 'TIME', 'SRC', 'DST', 'PORT', 'PROTO', 'PACKETS', 'BYTES', 'DUR'],
+    rows: [
+      { time: '08:58:02', src: '10.10.50.7',     dst: '198.51.100.30', port: 3389, proto: 'TCP', pkts: 4820, bytes: '2.4 MB', dur: '612s' },
+      { time: '09:00:41', src: '10.10.50.8',     dst: '198.51.100.30', port: 3389, proto: 'TCP', pkts: 3980, bytes: '1.9 MB', dur: '540s' },
+      { time: '09:01:11', src: '45.155.205.99',  dst: '198.51.100.30', port: 3389, proto: 'TCP', pkts: 3,    bytes: '280 B', dur: '0.3s' },
+      { time: '09:01:13', src: '45.155.205.99',  dst: '198.51.100.30', port: 3389, proto: 'TCP', pkts: 3,    bytes: '280 B', dur: '0.3s' },
+      { time: '09:01:15', src: '45.155.205.99',  dst: '198.51.100.30', port: 3389, proto: 'TCP', pkts: 3,    bytes: '280 B', dur: '0.3s' },
+      { time: '09:01:17', src: '45.155.205.99',  dst: '198.51.100.30', port: 3389, proto: 'TCP', pkts: 3,    bytes: '280 B', dur: '0.3s' },
+      { time: '09:01:19', src: '45.155.205.99',  dst: '198.51.100.30', port: 3389, proto: 'TCP', pkts: 3,    bytes: '280 B', dur: '0.3s' },
+      { time: '09:01:21', src: '45.155.205.99',  dst: '198.51.100.30', port: 3389, proto: 'TCP', pkts: 3,    bytes: '280 B', dur: '0.3s' },
+      { time: '09:01:23', src: '45.155.205.99',  dst: '198.51.100.30', port: 3389, proto: 'TCP', pkts: 3,    bytes: '280 B', dur: '0.3s' },
+      { time: '09:01:25', src: '45.155.205.99',  dst: '198.51.100.30', port: 3389, proto: 'TCP', pkts: 3,    bytes: '280 B', dur: '0.3s' },
+      { time: '09:01:44', src: '45.155.205.99',  dst: '198.51.100.30', port: 3389, proto: 'TCP', pkts: 6240, bytes: '3.1 MB', dur: '880s' },
+      { time: '09:05:02', src: '10.10.50.7',     dst: '198.51.100.30', port: 443,  proto: 'TCP', pkts: 88,   bytes: '42 KB', dur: '3.1s' },
+      { time: '09:14:11', src: '198.51.100.30',  dst: '10.10.10.20',   port: 3389, proto: 'TCP', pkts: 5120, bytes: '2.8 MB', dur: '720s' },
+    ],
+    malicious: [2, 3, 4, 5, 6, 7, 8, 9, 10, 12],
+    hint: 'A brute-force attempt is a <strong>burst</strong> of tiny, near-identical sessions from one source - a handful of packets each, sub-second, failing instantly. Then watch for the session that <strong>breaks the pattern</strong>: same source, suddenly long and data-heavy. That is the login that succeeded. And ask where the jump host talks <strong>next</strong>.',
+    explanation: 'Source <code>45.155.205.99</code> issued eight failed RDP attempts (rows 03-10) in ~15 seconds, each a 3-packet, 280-byte, 0.3s session - the signature of authentication failing at the NLA handshake before any real session is established. Row 11 breaks the pattern: the same external source completes a 3.1 MB, 880-second session, which is a successful interactive logon. Row 13 is the payoff - the jump host <code>198.51.100.30</code> then initiates RDP <em>inward</em> to <code>10.10.10.20</code>, lateral movement from the foothold. The two sessions from <code>10.10.50.7</code> and <code>10.10.50.8</code> (rows 01-02) are legitimate admins from the management subnet, and the port-443 session (row 12) is normal management traffic. The lesson: a brute force is only half the finding. The session that succeeds and the first hop afterward are what turn an alert into an incident.',
+    mitre: [
+      { id: 'T1110.001', name: 'Brute Force: Password Guessing' },
+      { id: 'T1133',     name: 'External Remote Services' },
+      { id: 'T1021.001', name: 'Remote Services: Remote Desktop Protocol' },
+    ],
+    relatedTechniques: [
+      { id: 'T1078', name: 'Valid Accounts', note: 'the successful login uses guessed-or-cracked credentials' },
+      { id: 'T1190', name: 'Exploit Public-Facing Application', note: 'alternative initial-access path for an internet-exposed service' },
+    ],
+    detection: [
+      { tool: 'arkime',   label: 'Arkime',       code: 'ip.src == 45.155.205.99 && port.dst == 3389' },
+      { tool: 'kibana',   label: 'Kibana (KQL)', code: 'destination.port:3389 AND source.ip:"45.155.205.99" AND event.outcome:"failure"' },
+      { tool: 'suricata', label: 'Suricata',     code: 'alert tcp $EXTERNAL_NET any -> $HOME_NET 3389 (msg:"RDP brute force - connection burst from single source"; flow:to_server; flags:S; threshold:type both, track by_src, count 20, seconds 60; sid:1000014;)' },
+    ],
+  },
+
+  /* ====== SCN-018 · COMMAND & CONTROL · Outbound SSH Reverse Tunnel ====== */
+  {
+    id: 'SCN-018',
+    title: 'Outbound SSH Reverse Tunnel',
+    difficulty: 'MEDIUM',
+    viewType: 'flows',
+    brief: 'Outbound flows from developer workstation <strong>10.10.20.44</strong> over a workday. SSH (22/tcp) is expected here - the developer reaches the internal bastion <strong>10.10.10.9</strong> and clones from GitHub over SSH. Identify any SSH session that does not fit those two legitimate uses and looks like a persistent tunnel out of the network.',
+    columns: ['#', 'TIME', 'SRC', 'DST', 'PORT', 'PROTO', 'PACKETS', 'BYTES', 'DUR'],
+    rows: [
+      { time: '09:02:11', src: '10.10.20.44', dst: '10.10.10.9',      port: 22,  proto: 'TCP', pkts: 1240, bytes: '880 KB', dur: '142s' },
+      { time: '09:05:42', src: '10.10.20.44', dst: '140.82.112.3',    port: 22,  proto: 'TCP', pkts: 320,  bytes: '88 KB',  dur: '12s' },
+      { time: '09:08:14', src: '10.10.20.44', dst: '167.71.13.207',   port: 22,  proto: 'TCP', pkts: 8442, bytes: '1.2 MB', dur: '10840s' },
+      { time: '09:11:02', src: '10.10.20.44', dst: '142.250.80.46',   port: 443, proto: 'TCP', pkts: 88,   bytes: '142 KB', dur: '3.1s' },
+      { time: '09:14:33', src: '10.10.20.44', dst: '140.82.112.3',    port: 22,  proto: 'TCP', pkts: 210,  bytes: '64 KB',  dur: '8s' },
+      { time: '12:10:02', src: '10.10.20.44', dst: '167.71.13.207',   port: 22,  proto: 'TCP', pkts: 7980, bytes: '1.1 MB', dur: '9620s' },
+      { time: '12:12:41', src: '10.10.20.44', dst: '140.82.112.3',    port: 22,  proto: 'TCP', pkts: 180,  bytes: '52 KB',  dur: '7s' },
+      { time: '12:30:14', src: '10.10.20.44', dst: '13.107.42.14',    port: 443, proto: 'TCP', pkts: 240,  bytes: '320 KB', dur: '5.2s' },
+      { time: '15:42:11', src: '10.10.20.44', dst: '167.71.13.207',   port: 22,  proto: 'TCP', pkts: 8210, bytes: '1.2 MB', dur: '10220s' },
+      { time: '16:02:02', src: '10.10.20.44', dst: '10.10.10.9',      port: 22,  proto: 'TCP', pkts: 980,  bytes: '640 KB', dur: '88s' },
+    ],
+    malicious: [2, 5, 8],
+    hint: 'Two SSH destinations are expected: the internal bastion (<code>10.10.10.9</code>) and GitHub (<code>140.82.112.0/24</code>). Anything else on port 22 is a <strong>third destination</strong> that should not exist. Look at the <strong>duration</strong> and the <strong>throughput</strong>: a multi-hour session moving only ~1 MB is an idle interactive tunnel held open, not a file transfer.',
+    explanation: 'Three SSH sessions go to <code>167.71.13.207</code>, an external VPS that is neither the bastion nor GitHub. Each runs for hours (10840s, 9620s, 10220s) while moving only ~1.2 MB - the signature of a reverse SSH tunnel held open for interactive access or port forwarding, where the bulk of the traffic is keepalives rather than payload. The session re-establishes three times across the day, consistent with an autossh-style persistent tunnel reconnecting after drops. The legitimate SSH is easy to confirm once you know the baseline: the bastion sessions (rows 01, 10) are short and internal, and the GitHub sessions (rows 02, 05, 07) are brief clone/fetch operations to a known range. The HTTPS rows (04, 08) are ordinary browsing. The trap is the GitHub SSH - it is also port 22 to the internet, but its destination is allowlisted and its sessions are seconds long, not hours. The discipline: SSH is not inherently suspicious, but a long-lived, low-throughput SSH session to an unsanctioned host is one of the cleaner tunnel indicators you will find.',
+    mitre: [
+      { id: 'T1572',     name: 'Protocol Tunneling' },
+      { id: 'T1021.004', name: 'Remote Services: SSH' },
+      { id: 'T1071.001', name: 'Application Layer Protocol: Web Protocols' },
+    ],
+    relatedTechniques: [
+      { id: 'T1090', name: 'Proxy', note: 'a reverse tunnel is often used to pivot deeper into the network' },
+      { id: 'T1219', name: 'Remote Access Software', note: 'related persistent-access tradecraft' },
+    ],
+    detection: [
+      { tool: 'arkime',   label: 'Arkime',       code: 'protocols == ssh && ip.dst != 10.10.10.9 && ip.dst != 140.82.112.0/24 && session.length > 3600000' },
+      { tool: 'kibana',   label: 'Kibana (KQL)', code: 'network.protocol:"ssh" AND destination.port:22 AND NOT destination.ip:("10.10.10.9" OR "140.82.112.0/24") AND event.duration > 3600000000000' },
+      { tool: 'suricata', label: 'Suricata',     code: 'alert ssh $HOME_NET any -> $EXTERNAL_NET 22 (msg:"Long-lived outbound SSH to unsanctioned host - possible reverse tunnel"; flow:established,to_server; sid:1000018;)' },
+    ],
+  },
+
+  /* ====== SCN-019 · COMMAND & CONTROL · LOLBin Ingress Tool Transfer ====== */
+  {
+    id: 'SCN-019',
+    title: 'Living-off-the-Land Tool Download',
+    difficulty: 'MEDIUM',
+    viewType: 'logs',
+    brief: 'Proxy access logs for workstation <strong>10.10.20.66</strong>. After a phishing click, the SOC wants to know whether a second-stage payload was pulled down. Legitimate software downloads and Windows Update traffic are present and must not be flagged. Identify requests where a <strong>built-in Windows binary</strong> is being abused to fetch tooling from the internet.',
+    rows: [
+      { time: '10:02:14', src: 'proxy.log', msg: '10.10.20.66 → GET https://www.google.com/ 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0"' },
+      { time: '10:04:42', src: 'proxy.log', msg: '10.10.20.66 → GET https://download.mozilla.org/firefox/firefox-setup.exe 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0"' },
+      { time: '10:06:18', src: 'proxy.log', msg: '10.10.20.66 → GET http://au.download.windowsupdate.com/d/msdownload/update/patch.cab 200 "Microsoft-Delivery-Optimization/10.0"' },
+      { time: '10:08:02', src: 'proxy.log', msg: '10.10.20.66 → GET http://185.244.25.171/a.exe 200 "CertUtil URL Agent"' },
+      { time: '10:08:41', src: 'proxy.log', msg: '10.10.20.66 → GET https://pastebin.com/raw/9xKf2Lq1 200 "Mozilla/5.0 (Windows NT; Windows NT 10.0) WindowsPowerShell/5.1.19041.1"' },
+      { time: '10:09:14', src: 'proxy.log', msg: '10.10.20.66 → GET https://outlook.office365.com/owa/ 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0"' },
+      { time: '10:11:33', src: 'proxy.log', msg: '10.10.20.66 → GET http://185.244.25.171/beacon.dll 200 "Microsoft BITS/7.8"' },
+      { time: '10:12:02', src: 'proxy.log', msg: '10.10.20.66 → GET https://raw.githubusercontent.com/xj9k-tmp/dropper/main/run.ps1 200 "Mozilla/5.0 (Windows NT; Windows NT 10.0) WindowsPowerShell/5.1.19041.1"' },
+      { time: '10:14:51', src: 'proxy.log', msg: '10.10.20.66 → GET https://github.com/torvalds/linux 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0"' },
+      { time: '10:18:22', src: 'proxy.log', msg: '10.10.20.66 → GET http://185.244.25.171/a.exe 200 "CertUtil URL Agent"' },
+    ],
+    malicious: [3, 4, 6, 7, 9],
+    hint: 'Read the <strong>user-agent</strong> against the <strong>destination</strong> together. A browser UA fetching an installer from a vendor is normal. But <code>CertUtil</code>, <code>Microsoft BITS</code>, and <code>WindowsPowerShell</code> user-agents fetching executables, DLLs, or scripts from raw IPs and paste sites are built-in binaries being weaponized to pull payloads. Note that Windows Update <em>also</em> uses a Microsoft user-agent - check where it is going.',
+    explanation: 'Five requests show living-off-the-land tool transfer. Row 04 and row 10: <code>certutil.exe</code> (user-agent <code>CertUtil URL Agent</code>) downloading <code>a.exe</code> from a raw IP - certutil is a certificate utility, not a downloader, and this is its classic abuse. Row 05 and row 08: a <code>WindowsPowerShell</code> user-agent fetching a script from <code>pastebin.com/raw</code> and a throwaway <code>raw.githubusercontent.com</code> repo, the fingerprint of an <code>IEX (New-Object Net.WebClient).DownloadString</code> stager. Row 07: <code>Microsoft BITS/7.8</code> pulling <code>beacon.dll</code> from the same raw IP as the certutil download - bitsadmin abuse. The trap is row 03: Windows Update <em>also</em> uses a Microsoft user-agent (<code>Microsoft-Delivery-Optimization</code>), but it goes to <code>windowsupdate.com</code>, so it is legitimate. The browser installer download (row 02) and ordinary browsing (rows 01, 06, 09) are benign. The lesson: the user-agent alone is not the signal and not the noise. It is the pairing of an unexpected built-in-binary UA with an untrusted destination that betrays the download.',
+    mitre: [
+      { id: 'T1105', name: 'Ingress Tool Transfer' },
+      { id: 'T1197', name: 'BITS Jobs' },
+      { id: 'T1059.001', name: 'Command and Scripting Interpreter: PowerShell' },
+    ],
+    relatedTechniques: [
+      { id: 'T1218', name: 'System Binary Proxy Execution', note: 'certutil and bitsadmin are signed binaries abused to proxy the download' },
+      { id: 'T1140', name: 'Deobfuscate/Decode Files or Information', note: 'certutil is also commonly abused to decode base64 payloads' },
+    ],
+    detection: [
+      { tool: 'arkime',   label: 'Arkime',       code: 'http.user-agent == "CertUtil*" || (http.user-agent == "Microsoft BITS*" && host.http != "*.windowsupdate.com") || (http.user-agent == "*WindowsPowerShell*" && http.uri == "*.ps1")' },
+      { tool: 'kibana',   label: 'Kibana (KQL)', code: 'user_agent.original:(*CertUtil* OR *WindowsPowerShell* OR "Microsoft BITS*") AND NOT destination.domain:(*.microsoft.com OR *.windowsupdate.com)' },
+      { tool: 'suricata', label: 'Suricata',     code: 'alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"LOLBin download - certutil URL agent"; flow:to_server; http.user_agent; content:"CertUtil"; nocase; startswith; sid:1000019;)' },
+    ],
+  },
+
   /* ====== SCN-006 · LATERAL MOVEMENT · WinRM ====== */
   {
     id: 'SCN-006',
@@ -623,44 +830,6 @@ const SCENARIOS = [
       { tool: 'arkime',   label: 'Arkime',       code: 'krb5.etype == "rc4-hmac" && krb5.cname == "dwilliams"' },
       { tool: 'kibana',   label: 'Kibana (KQL)', code: 'event.dataset:"kerberos" AND kerberos.cipher:"rc4-hmac" AND kerberos.message_type:"TGS-REQ"' },
       { tool: 'suricata', label: 'Suricata',     code: 'alert tcp $HOME_NET any -> $DOMAIN_CONTROLLERS 88 (msg:"Possible Kerberoasting - RC4 TGS-REQ burst"; flow:to_server; threshold:type both, track by_src, count 5, seconds 60; sid:1000007;)' },
-    ],
-  },
-
-  /* ====== SCN-008 · COLLECTION · Bulk Confluence Access ====== */
-  {
-    id: 'SCN-008',
-    title: 'Bulk Document Collection',
-    difficulty: 'MEDIUM',
-    viewType: 'flows',
-    brief: 'User <strong>10.10.30.42</strong> accessed the internal Confluence wiki at <strong>10.10.40.15</strong>. Their normal pattern is 5-15 page views per session. Identify activity consistent with bulk content harvesting.',
-    columns: ['#', 'TIME', 'SRC', 'DST', 'PORT', 'PROTO', 'PACKETS', 'BYTES', 'DUR'],
-    rows: [
-      { time: '09:02:14', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 22,   bytes: '14 KB',   dur: '0.8s' },
-      { time: '09:02:52', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 18,   bytes: '11 KB',   dur: '0.6s' },
-      { time: '09:04:02', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 28,   bytes: '18 KB',   dur: '1.1s' },
-      { time: '09:18:33', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 1842, bytes: '8.4 MB',  dur: '14.2s' },
-      { time: '09:18:49', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 1788, bytes: '8.1 MB',  dur: '13.8s' },
-      { time: '09:19:04', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 1922, bytes: '8.7 MB',  dur: '14.6s' },
-      { time: '09:19:21', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 1855, bytes: '8.3 MB',  dur: '14.1s' },
-      { time: '09:19:38', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 1798, bytes: '8.2 MB',  dur: '13.9s' },
-      { time: '09:21:11', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 24,   bytes: '15 KB',   dur: '0.9s' },
-      { time: '09:24:42', src: '10.10.30.42', dst: '10.10.40.15', port: 443, proto: 'TCP', pkts: 32,   bytes: '21 KB',   dur: '1.2s' },
-    ],
-    malicious: [3, 4, 5, 6, 7],
-    hint: 'Compare bytes and packets across sessions. Normal wiki browsing pulls KBs per page. <strong>Sustained MB-scale transfers</strong> at regular intervals look more like an automated scraper or API export.',
-    explanation: 'Five sessions (rows 04-08) show a consistent pattern: ~8 MB transferred per connection, ~1800 packets, ~14 seconds duration, occurring roughly 15 seconds apart. This signature is consistent with an attacker using the Confluence REST API or a scraping tool to bulk-export pages - possibly via <code>/rest/api/content?expand=body.storage&limit=100</code>. Normal interactive wiki browsing (rows 01-03, 09-10) shows ~15-20 KB per page view with multi-second gaps between requests as the user reads. The 5x volume jump and rapid cadence strongly indicate automated collection. Whether this is a malicious insider, compromised credentials, or sanctioned bulk export is a separate investigation - but the pattern alone warrants escalation.',
-    mitre: [
-      { id: 'T1213.001', name: 'Data from Information Repositories: Confluence' },
-      { id: 'T1119',     name: 'Automated Collection' },
-    ],
-    relatedTechniques: [
-      { id: 'T1530', name: 'Data from Cloud Storage', note: 'if Confluence were cloud-hosted' },
-      { id: 'T1083', name: 'File and Directory Discovery', note: 'enumeration step that would precede bulk export' },
-    ],
-    detection: [
-      { tool: 'arkime',   label: 'Arkime',       code: 'ip.src == 10.10.30.42 && ip.dst == 10.10.40.15 && databytes > 5000000' },
-      { tool: 'kibana',   label: 'Kibana (KQL)', code: 'source.ip:"10.10.30.42" AND destination.ip:"10.10.40.15" AND network.bytes > 5000000' },
-      { tool: 'suricata', label: 'Suricata',     code: 'alert tcp $HOME_NET any -> $WIKI_SERVERS 443 (msg:"Bulk Confluence egress - large repeated transfer"; flow:established,from_server; threshold:type both, track by_src, count 3, seconds 120; sid:1000008;)' },
     ],
   },
 
@@ -832,92 +1001,6 @@ const SCENARIOS = [
     ],
   },
 
-  /* ====== SCN-013 · C2 · Cobalt Strike Default Profile ====== */
-  {
-    id: 'SCN-013',
-    title: 'Cobalt Strike Default Profile',
-    difficulty: 'MEDIUM',
-    viewType: 'logs',
-    brief: 'HTTP access logs from the perimeter proxy covering workstation <strong>10.10.20.88</strong>. The host has been flagged by EDR for an unexplained process injection event. Review the web traffic to determine whether C2 activity is present - and if so, identify which sessions belong to the implant rather than the user.',
-    rows: [
-      { time: '09:02:14', src: 'proxy.log', msg: 'GET https://news.bbc.co.uk/ 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"' },
-      { time: '09:03:42', src: 'proxy.log', msg: 'GET https://mail.google.com/mail/u/0/ 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"' },
-      { time: '09:04:18', src: 'proxy.log', msg: 'GET http://203.0.113.88/activity 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
-      { time: '09:04:52', src: 'proxy.log', msg: 'GET https://cdn.jquery.com/jquery-3.7.1.min.js 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"' },
-      { time: '09:05:04', src: 'proxy.log', msg: 'POST http://203.0.113.88/submit.php 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
-      { time: '09:12:11', src: 'proxy.log', msg: 'GET https://outlook.office365.com/owa/ 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"' },
-      { time: '09:14:18', src: 'proxy.log', msg: 'GET http://203.0.113.88/px.gif 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
-      { time: '09:14:52', src: 'proxy.log', msg: 'GET https://docs.microsoft.com/en-us/ 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"' },
-      { time: '09:24:19', src: 'proxy.log', msg: 'GET http://203.0.113.88/activity 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
-      { time: '09:24:53', src: 'proxy.log', msg: 'POST http://203.0.113.88/submit.php 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
-      { time: '09:31:14', src: 'proxy.log', msg: 'GET https://github.com/ 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"' },
-      { time: '09:34:19', src: 'proxy.log', msg: 'GET http://203.0.113.88/px.gif 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
-      { time: '09:34:52', src: 'proxy.log', msg: 'POST http://203.0.113.88/submit.php 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
-      { time: '09:41:55', src: 'proxy.log', msg: 'GET https://www.reddit.com/ 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"' },
-      { time: '09:44:19', src: 'proxy.log', msg: 'GET http://203.0.113.88/activity 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
-      { time: '09:44:52', src: 'proxy.log', msg: 'POST http://203.0.113.88/submit.php 200 "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"' },
-    ],
-    malicious: [2, 4, 6, 8, 9, 11, 12, 14, 15],
-    hint: 'Two things to focus on. First: <strong>user-agent strings</strong>. IE9 on Windows 7 (<code>MSIE 9.0; Windows NT 6.1</code>) hasn\'t been a real browser in over a decade. Second: <strong>URI patterns</strong>. Cross-reference the flagged destination IP against the URIs being requested - some of them have a very specific reputation.',
-    explanation: 'Nine requests to <code>203.0.113.88</code> are issued by a process impersonating IE9 on Windows 7 - a user-agent that hasn\'t reflected a real browser since 2016. The URIs tell the rest of the story: <code>/activity</code> and <code>/px.gif</code> are check-in requests (the beacon polling for tasking), while <code>/submit.php</code> is the data upload path. These three URIs are part of the Cobalt Strike default HTTP Malleable C2 profile, and are so well-known among defenders that any operator still running the default profile is either new or careless. The beacon cycle is visible too: GET /activity, POST /submit.php pairs repeating at roughly 10-minute intervals (09:04, 09:14 partial, 09:24, 09:34, 09:44) with some jitter. The legitimate user traffic interspersed throughout uses a current Chrome UA and hits recognizable destinations - BBC, Gmail, Outlook, GitHub. Two separate processes are making HTTP requests from this host: the user\'s browser, and the implant.',
-    mitre: [
-      { id: 'T1071.001', name: 'Application Layer Protocol: Web Protocols' },
-      { id: 'T1001.001', name: 'Data Obfuscation: Junk Data' },
-      { id: 'T1036.005', name: 'Masquerading: Match Legitimate Name or Location' },
-    ],
-    relatedTechniques: [
-      { id: 'T1055', name: 'Process Injection', note: 'EDR flagged injection before this traffic appeared' },
-      { id: 'T1027.005', name: 'Obfuscated Files or Information: Indicator Removal from Tools', note: 'operators customizing the profile to avoid this detection' },
-    ],
-    detection: [
-      { tool: 'arkime',   label: 'Arkime',       code: 'http.user-agent == "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)" && (http.uri == "/activity" || http.uri == "/submit.php" || http.uri == "/px.gif")' },
-      { tool: 'kibana',   label: 'Kibana (KQL)', code: 'user_agent.original:"Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)" AND url.path:(/activity OR /submit.php OR /px.gif)' },
-      { tool: 'suricata', label: 'Suricata',     code: 'alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"Cobalt Strike default profile UA - MSIE 9.0 Win7"; http.user_agent; content:"MSIE 9.0"; content:"Windows NT 6.1"; within:60; sid:1000013;)' },
-    ],
-  },
-
-  /* ====== SCN-014 · INITIAL ACCESS · RDP Brute Force ====== */
-  {
-    id: 'SCN-014',
-    title: 'RDP Brute Force and Access',
-    difficulty: 'MEDIUM',
-    viewType: 'flows',
-    brief: 'Inbound flows to the DMZ jump host <strong>198.51.100.30</strong>, which exposes RDP (3389/tcp) for remote admin use. Legitimate administrators connect from the internal management subnet <strong>10.10.50.0/24</strong>. Identify activity consistent with a brute-force attack and any session that indicates the attacker got in.',
-    columns: ['#', 'TIME', 'SRC', 'DST', 'PORT', 'PROTO', 'PACKETS', 'BYTES', 'DUR'],
-    rows: [
-      { time: '08:58:02', src: '10.10.50.7',     dst: '198.51.100.30', port: 3389, proto: 'TCP', pkts: 4820, bytes: '2.4 MB', dur: '612s' },
-      { time: '09:00:41', src: '10.10.50.8',     dst: '198.51.100.30', port: 3389, proto: 'TCP', pkts: 3980, bytes: '1.9 MB', dur: '540s' },
-      { time: '09:01:11', src: '45.155.205.99',  dst: '198.51.100.30', port: 3389, proto: 'TCP', pkts: 3,    bytes: '280 B', dur: '0.3s' },
-      { time: '09:01:13', src: '45.155.205.99',  dst: '198.51.100.30', port: 3389, proto: 'TCP', pkts: 3,    bytes: '280 B', dur: '0.3s' },
-      { time: '09:01:15', src: '45.155.205.99',  dst: '198.51.100.30', port: 3389, proto: 'TCP', pkts: 3,    bytes: '280 B', dur: '0.3s' },
-      { time: '09:01:17', src: '45.155.205.99',  dst: '198.51.100.30', port: 3389, proto: 'TCP', pkts: 3,    bytes: '280 B', dur: '0.3s' },
-      { time: '09:01:19', src: '45.155.205.99',  dst: '198.51.100.30', port: 3389, proto: 'TCP', pkts: 3,    bytes: '280 B', dur: '0.3s' },
-      { time: '09:01:21', src: '45.155.205.99',  dst: '198.51.100.30', port: 3389, proto: 'TCP', pkts: 3,    bytes: '280 B', dur: '0.3s' },
-      { time: '09:01:23', src: '45.155.205.99',  dst: '198.51.100.30', port: 3389, proto: 'TCP', pkts: 3,    bytes: '280 B', dur: '0.3s' },
-      { time: '09:01:25', src: '45.155.205.99',  dst: '198.51.100.30', port: 3389, proto: 'TCP', pkts: 3,    bytes: '280 B', dur: '0.3s' },
-      { time: '09:01:44', src: '45.155.205.99',  dst: '198.51.100.30', port: 3389, proto: 'TCP', pkts: 6240, bytes: '3.1 MB', dur: '880s' },
-      { time: '09:05:02', src: '10.10.50.7',     dst: '198.51.100.30', port: 443,  proto: 'TCP', pkts: 88,   bytes: '42 KB', dur: '3.1s' },
-      { time: '09:14:11', src: '198.51.100.30',  dst: '10.10.10.20',   port: 3389, proto: 'TCP', pkts: 5120, bytes: '2.8 MB', dur: '720s' },
-    ],
-    malicious: [2, 3, 4, 5, 6, 7, 8, 9, 10, 12],
-    hint: 'A brute-force attempt is a <strong>burst</strong> of tiny, near-identical sessions from one source - a handful of packets each, sub-second, failing instantly. Then watch for the session that <strong>breaks the pattern</strong>: same source, suddenly long and data-heavy. That is the login that succeeded. And ask where the jump host talks <strong>next</strong>.',
-    explanation: 'Source <code>45.155.205.99</code> issued eight failed RDP attempts (rows 03-10) in ~15 seconds, each a 3-packet, 280-byte, 0.3s session - the signature of authentication failing at the NLA handshake before any real session is established. Row 11 breaks the pattern: the same external source completes a 3.1 MB, 880-second session, which is a successful interactive logon. Row 13 is the payoff - the jump host <code>198.51.100.30</code> then initiates RDP <em>inward</em> to <code>10.10.10.20</code>, lateral movement from the foothold. The two sessions from <code>10.10.50.7</code> and <code>10.10.50.8</code> (rows 01-02) are legitimate admins from the management subnet, and the port-443 session (row 12) is normal management traffic. The lesson: a brute force is only half the finding. The session that succeeds and the first hop afterward are what turn an alert into an incident.',
-    mitre: [
-      { id: 'T1110.001', name: 'Brute Force: Password Guessing' },
-      { id: 'T1133',     name: 'External Remote Services' },
-      { id: 'T1021.001', name: 'Remote Services: Remote Desktop Protocol' },
-    ],
-    relatedTechniques: [
-      { id: 'T1078', name: 'Valid Accounts', note: 'the successful login uses guessed-or-cracked credentials' },
-      { id: 'T1190', name: 'Exploit Public-Facing Application', note: 'alternative initial-access path for an internet-exposed service' },
-    ],
-    detection: [
-      { tool: 'arkime',   label: 'Arkime',       code: 'ip.src == 45.155.205.99 && port.dst == 3389' },
-      { tool: 'kibana',   label: 'Kibana (KQL)', code: 'destination.port:3389 AND source.ip:"45.155.205.99" AND event.outcome:"failure"' },
-      { tool: 'suricata', label: 'Suricata',     code: 'alert tcp $EXTERNAL_NET any -> $HOME_NET 3389 (msg:"RDP brute force - connection burst from single source"; flow:to_server; flags:S; threshold:type both, track by_src, count 20, seconds 60; sid:1000014;)' },
-    ],
-  },
-
   /* ====== SCN-015 · IMPACT · Ransomware Pre-Encryption Staging ====== */
   {
     id: 'SCN-015',
@@ -1039,83 +1122,6 @@ const SCENARIOS = [
     ],
   },
 
-  /* ====== SCN-018 · COMMAND & CONTROL · Outbound SSH Reverse Tunnel ====== */
-  {
-    id: 'SCN-018',
-    title: 'Outbound SSH Reverse Tunnel',
-    difficulty: 'MEDIUM',
-    viewType: 'flows',
-    brief: 'Outbound flows from developer workstation <strong>10.10.20.44</strong> over a workday. SSH (22/tcp) is expected here - the developer reaches the internal bastion <strong>10.10.10.9</strong> and clones from GitHub over SSH. Identify any SSH session that does not fit those two legitimate uses and looks like a persistent tunnel out of the network.',
-    columns: ['#', 'TIME', 'SRC', 'DST', 'PORT', 'PROTO', 'PACKETS', 'BYTES', 'DUR'],
-    rows: [
-      { time: '09:02:11', src: '10.10.20.44', dst: '10.10.10.9',      port: 22,  proto: 'TCP', pkts: 1240, bytes: '880 KB', dur: '142s' },
-      { time: '09:05:42', src: '10.10.20.44', dst: '140.82.112.3',    port: 22,  proto: 'TCP', pkts: 320,  bytes: '88 KB',  dur: '12s' },
-      { time: '09:08:14', src: '10.10.20.44', dst: '167.71.13.207',   port: 22,  proto: 'TCP', pkts: 8442, bytes: '1.2 MB', dur: '10840s' },
-      { time: '09:11:02', src: '10.10.20.44', dst: '142.250.80.46',   port: 443, proto: 'TCP', pkts: 88,   bytes: '142 KB', dur: '3.1s' },
-      { time: '09:14:33', src: '10.10.20.44', dst: '140.82.112.3',    port: 22,  proto: 'TCP', pkts: 210,  bytes: '64 KB',  dur: '8s' },
-      { time: '12:10:02', src: '10.10.20.44', dst: '167.71.13.207',   port: 22,  proto: 'TCP', pkts: 7980, bytes: '1.1 MB', dur: '9620s' },
-      { time: '12:12:41', src: '10.10.20.44', dst: '140.82.112.3',    port: 22,  proto: 'TCP', pkts: 180,  bytes: '52 KB',  dur: '7s' },
-      { time: '12:30:14', src: '10.10.20.44', dst: '13.107.42.14',    port: 443, proto: 'TCP', pkts: 240,  bytes: '320 KB', dur: '5.2s' },
-      { time: '15:42:11', src: '10.10.20.44', dst: '167.71.13.207',   port: 22,  proto: 'TCP', pkts: 8210, bytes: '1.2 MB', dur: '10220s' },
-      { time: '16:02:02', src: '10.10.20.44', dst: '10.10.10.9',      port: 22,  proto: 'TCP', pkts: 980,  bytes: '640 KB', dur: '88s' },
-    ],
-    malicious: [2, 5, 8],
-    hint: 'Two SSH destinations are expected: the internal bastion (<code>10.10.10.9</code>) and GitHub (<code>140.82.112.0/24</code>). Anything else on port 22 is a <strong>third destination</strong> that should not exist. Look at the <strong>duration</strong> and the <strong>throughput</strong>: a multi-hour session moving only ~1 MB is an idle interactive tunnel held open, not a file transfer.',
-    explanation: 'Three SSH sessions go to <code>167.71.13.207</code>, an external VPS that is neither the bastion nor GitHub. Each runs for hours (10840s, 9620s, 10220s) while moving only ~1.2 MB - the signature of a reverse SSH tunnel held open for interactive access or port forwarding, where the bulk of the traffic is keepalives rather than payload. The session re-establishes three times across the day, consistent with an autossh-style persistent tunnel reconnecting after drops. The legitimate SSH is easy to confirm once you know the baseline: the bastion sessions (rows 01, 10) are short and internal, and the GitHub sessions (rows 02, 05, 07) are brief clone/fetch operations to a known range. The HTTPS rows (04, 08) are ordinary browsing. The trap is the GitHub SSH - it is also port 22 to the internet, but its destination is allowlisted and its sessions are seconds long, not hours. The discipline: SSH is not inherently suspicious, but a long-lived, low-throughput SSH session to an unsanctioned host is one of the cleaner tunnel indicators you will find.',
-    mitre: [
-      { id: 'T1572',     name: 'Protocol Tunneling' },
-      { id: 'T1021.004', name: 'Remote Services: SSH' },
-      { id: 'T1071.001', name: 'Application Layer Protocol: Web Protocols' },
-    ],
-    relatedTechniques: [
-      { id: 'T1090', name: 'Proxy', note: 'a reverse tunnel is often used to pivot deeper into the network' },
-      { id: 'T1219', name: 'Remote Access Software', note: 'related persistent-access tradecraft' },
-    ],
-    detection: [
-      { tool: 'arkime',   label: 'Arkime',       code: 'protocols == ssh && ip.dst != 10.10.10.9 && ip.dst != 140.82.112.0/24 && session.length > 3600000' },
-      { tool: 'kibana',   label: 'Kibana (KQL)', code: 'network.protocol:"ssh" AND destination.port:22 AND NOT destination.ip:("10.10.10.9" OR "140.82.112.0/24") AND event.duration > 3600000000000' },
-      { tool: 'suricata', label: 'Suricata',     code: 'alert ssh $HOME_NET any -> $EXTERNAL_NET 22 (msg:"Long-lived outbound SSH to unsanctioned host - possible reverse tunnel"; flow:established,to_server; sid:1000018;)' },
-    ],
-  },
-
-  /* ====== SCN-019 · COMMAND & CONTROL · LOLBin Ingress Tool Transfer ====== */
-  {
-    id: 'SCN-019',
-    title: 'Living-off-the-Land Tool Download',
-    difficulty: 'MEDIUM',
-    viewType: 'logs',
-    brief: 'Proxy access logs for workstation <strong>10.10.20.66</strong>. After a phishing click, the SOC wants to know whether a second-stage payload was pulled down. Legitimate software downloads and Windows Update traffic are present and must not be flagged. Identify requests where a <strong>built-in Windows binary</strong> is being abused to fetch tooling from the internet.',
-    rows: [
-      { time: '10:02:14', src: 'proxy.log', msg: '10.10.20.66 → GET https://www.google.com/ 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0"' },
-      { time: '10:04:42', src: 'proxy.log', msg: '10.10.20.66 → GET https://download.mozilla.org/firefox/firefox-setup.exe 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0"' },
-      { time: '10:06:18', src: 'proxy.log', msg: '10.10.20.66 → GET http://au.download.windowsupdate.com/d/msdownload/update/patch.cab 200 "Microsoft-Delivery-Optimization/10.0"' },
-      { time: '10:08:02', src: 'proxy.log', msg: '10.10.20.66 → GET http://185.244.25.171/a.exe 200 "CertUtil URL Agent"' },
-      { time: '10:08:41', src: 'proxy.log', msg: '10.10.20.66 → GET https://pastebin.com/raw/9xKf2Lq1 200 "Mozilla/5.0 (Windows NT; Windows NT 10.0) WindowsPowerShell/5.1.19041.1"' },
-      { time: '10:09:14', src: 'proxy.log', msg: '10.10.20.66 → GET https://outlook.office365.com/owa/ 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0"' },
-      { time: '10:11:33', src: 'proxy.log', msg: '10.10.20.66 → GET http://185.244.25.171/beacon.dll 200 "Microsoft BITS/7.8"' },
-      { time: '10:12:02', src: 'proxy.log', msg: '10.10.20.66 → GET https://raw.githubusercontent.com/xj9k-tmp/dropper/main/run.ps1 200 "Mozilla/5.0 (Windows NT; Windows NT 10.0) WindowsPowerShell/5.1.19041.1"' },
-      { time: '10:14:51', src: 'proxy.log', msg: '10.10.20.66 → GET https://github.com/torvalds/linux 200 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0"' },
-      { time: '10:18:22', src: 'proxy.log', msg: '10.10.20.66 → GET http://185.244.25.171/a.exe 200 "CertUtil URL Agent"' },
-    ],
-    malicious: [3, 4, 6, 7, 9],
-    hint: 'Read the <strong>user-agent</strong> against the <strong>destination</strong> together. A browser UA fetching an installer from a vendor is normal. But <code>CertUtil</code>, <code>Microsoft BITS</code>, and <code>WindowsPowerShell</code> user-agents fetching executables, DLLs, or scripts from raw IPs and paste sites are built-in binaries being weaponized to pull payloads. Note that Windows Update <em>also</em> uses a Microsoft user-agent - check where it is going.',
-    explanation: 'Five requests show living-off-the-land tool transfer. Row 04 and row 10: <code>certutil.exe</code> (user-agent <code>CertUtil URL Agent</code>) downloading <code>a.exe</code> from a raw IP - certutil is a certificate utility, not a downloader, and this is its classic abuse. Row 05 and row 08: a <code>WindowsPowerShell</code> user-agent fetching a script from <code>pastebin.com/raw</code> and a throwaway <code>raw.githubusercontent.com</code> repo, the fingerprint of an <code>IEX (New-Object Net.WebClient).DownloadString</code> stager. Row 07: <code>Microsoft BITS/7.8</code> pulling <code>beacon.dll</code> from the same raw IP as the certutil download - bitsadmin abuse. The trap is row 03: Windows Update <em>also</em> uses a Microsoft user-agent (<code>Microsoft-Delivery-Optimization</code>), but it goes to <code>windowsupdate.com</code>, so it is legitimate. The browser installer download (row 02) and ordinary browsing (rows 01, 06, 09) are benign. The lesson: the user-agent alone is not the signal and not the noise. It is the pairing of an unexpected built-in-binary UA with an untrusted destination that betrays the download.',
-    mitre: [
-      { id: 'T1105', name: 'Ingress Tool Transfer' },
-      { id: 'T1197', name: 'BITS Jobs' },
-      { id: 'T1059.001', name: 'Command and Scripting Interpreter: PowerShell' },
-    ],
-    relatedTechniques: [
-      { id: 'T1218', name: 'System Binary Proxy Execution', note: 'certutil and bitsadmin are signed binaries abused to proxy the download' },
-      { id: 'T1140', name: 'Deobfuscate/Decode Files or Information', note: 'certutil is also commonly abused to decode base64 payloads' },
-    ],
-    detection: [
-      { tool: 'arkime',   label: 'Arkime',       code: 'http.user-agent == "CertUtil*" || (http.user-agent == "Microsoft BITS*" && host.http != "*.windowsupdate.com") || (http.user-agent == "*WindowsPowerShell*" && http.uri == "*.ps1")' },
-      { tool: 'kibana',   label: 'Kibana (KQL)', code: 'user_agent.original:(*CertUtil* OR *WindowsPowerShell* OR "Microsoft BITS*") AND NOT destination.domain:(*.microsoft.com OR *.windowsupdate.com)' },
-      { tool: 'suricata', label: 'Suricata',     code: 'alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"LOLBin download - certutil URL agent"; flow:to_server; http.user_agent; content:"CertUtil"; nocase; startswith; sid:1000019;)' },
-    ],
-  },
-
   /* ====== SCN-020 · ICS/OT · Air-Gapped Segment Egress ====== */
   {
     id: 'SCN-020',
@@ -1179,7 +1185,7 @@ const state = {
 /* ============================================================
    NAVIGATION + PERSISTENCE
    ============================================================ */
-const STORAGE_KEY = 'sta_progress_v1';
+const STORAGE_KEY = 'sta_progress_v2';
 
 // A scenario is reachable if we're in challenge mode (free roam),
 // if it's at or below the furthest point reached in the guided path,
@@ -1213,7 +1219,7 @@ function persist() {
       if (sc) resultsById[sc.id] = state.results[k];
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      v: 1,
+      v: 2,
       mode: state.mode,
       scenarioIdx: state.scenarioIdx,
       maxReached: state.maxReached,
@@ -1227,7 +1233,7 @@ function loadState() {
   try {
     saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
   } catch (e) { saved = null; }
-  if (!saved || saved.v !== 1) return;
+  if (!saved || saved.v !== 2) return;
 
   if (saved.mode === 'tutorial' || saved.mode === 'challenge') state.mode = saved.mode;
 
@@ -1308,6 +1314,7 @@ function renderHeader() {
 
 function renderSidebar() {
   const toc = $('#toc');
+  let lastDiff = null;
   toc.innerHTML = SCENARIOS.map((sc, i) => {
     const result = state.results[i];
     const isActive = i === state.scenarioIdx;
@@ -1322,8 +1329,17 @@ function renderSidebar() {
     } else if (locked) {
       mark = `<span class="toc-mark">·</span>`;
     }
+    // Difficulty tier divider whenever the tier changes down the list
+    let divider = '';
+    if (sc.difficulty !== lastDiff) {
+      divider = `<div class="toc-tier">${sc.difficulty}</div>`;
+      lastDiff = sc.difficulty;
+    }
+    const stage = String(i + 1).padStart(2, '0');
     return `
+      ${divider}
       <div class="toc-item ${isActive ? 'active' : ''} ${isDone ? 'done' : ''} ${locked ? 'locked' : ''}" data-idx="${i}">
+        <span class="toc-stage">${stage}</span>
         <span class="toc-id">${sc.id}</span>
         <span class="toc-name">${sc.title}</span>
         ${mark}
